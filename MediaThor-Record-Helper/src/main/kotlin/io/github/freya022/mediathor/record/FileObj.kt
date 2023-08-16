@@ -6,7 +6,6 @@ import com.github.jnrwinfspteam.jnrwinfsp.api.ReparsePoint
 import com.github.jnrwinfspteam.jnrwinfsp.api.WinSysTime
 import com.github.jnrwinfspteam.jnrwinfsp.memfs.DirObj
 import com.github.jnrwinfspteam.jnrwinfsp.memfs.MemoryObj
-import it.unimi.dsi.fastutil.bytes.ByteArrayList
 import jnr.ffi.Pointer
 import java.nio.file.Path
 import kotlin.math.min
@@ -19,7 +18,8 @@ class FileObj(
     securityDescriptor: ByteArray,
     reparsePoint: ReparsePoint?
 ) : MemoryObj(parent, path, securityDescriptor, reparsePoint) {
-    private var data = ByteArrayList()
+    private var data = ByteArray(0)
+    private var dataSize = 0
     private var fileSize: Int = 0
 
     init {
@@ -28,7 +28,7 @@ class FileObj(
 
     @Synchronized
     override fun getAllocationSize(): Int {
-        return data.size
+        return dataSize
     }
 
     @Synchronized
@@ -40,7 +40,9 @@ class FileObj(
     fun setFileSize(fileSize: Int) {
         val prevFileSize = getFileSize()
         if (fileSize < prevFileSize) {
-            data.removeElements(fileSize, prevFileSize)
+            for (i in fileSize..<prevFileSize) {
+                data[i] = 0.toByte()
+            }
         } else if (fileSize > allocationSize) {
             adaptAllocationSize(fileSize)
         }
@@ -58,6 +60,10 @@ class FileObj(
         if (newAllocationSize != allocationSize) {
             // truncate or extend the data buffer
             val newFileSize = min(getFileSize(), newAllocationSize)
+            if (data.size < newAllocationSize) {
+                data = data.copyOf(newAllocationSize * 2)
+                dataSize = data.size
+            }
             fileSize = newFileSize
         }
     }
@@ -119,14 +125,14 @@ class FileObj(
     }
 }
 
-fun Pointer.put(dstOff: Int, src: ByteArrayList, srcOff: Int, len: Int) {
-    val tmpSrc = ByteArray(len)
-    src.getElements(srcOff, tmpSrc, 0, tmpSrc.size)
-    this.put(dstOff.toLong(), tmpSrc, srcOff, len)
-}
-
-fun Pointer.get(srcOff: Long, dst: ByteArrayList, dstOff: Int, len: Int) {
-    val tmpDst = ByteArray(len)
-    this.get(srcOff, tmpDst, 0, tmpDst.size)
-    dst.addElements(dstOff, tmpDst)
-}
+//fun Pointer.put(dstOff: Int, src: ByteArrayList, srcOff: Int, len: Int) {
+//    val tmpSrc = ByteArray(len)
+//    src.getElements(srcOff, tmpSrc, 0, tmpSrc.size)
+//    this.put(dstOff.toLong(), tmpSrc, srcOff, len)
+//}
+//
+//fun Pointer.get(srcOff: Long, dst: ByteArrayList, dstOff: Int, len: Int) {
+//    val tmpDst = ByteArray(len)
+//    this.get(srcOff, tmpDst, 0, tmpDst.size)
+//    dst.addElements(dstOff, tmpDst)
+//}
