@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+<fx:root alignment="CENTER_LEFT" spacing="5.0" type="HBox" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
+   <children>
+      <Spinner fx:id="adjustmentSpinner" prefWidth="100.0" />
+      <Button defaultButton="true" mnemonicParsing="false" onAction="#onAdjustAction" text="Adjust">
+         <graphic>
+            <FontIcon iconLiteral="mdrmz-volume_up" />
+         </graphic>
+      </Button>
+      <HBox alignment="CENTER_LEFT" spacing="5.0" HBox.hgrow="ALWAYS">
+         <children>
+            <Label fx:id="playbackTimestampLabel" text="00:00" />
+            <Slider fx:id="playbackSlider" styleClass="large" HBox.hgrow="ALWAYS" />
+            <Label fx:id="playbackDurationLabel" text="--:--" />
+         </children>
+      </HBox>
+      <Button maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" mnemonicParsing="false" onAction="#onPlaybackPlay" prefHeight="35.0" prefWidth="35.0">
+         <graphic>
+            <FontIcon fx:id="playbackIcon" iconLiteral="mdrmz-play_arrow" />
+         </graphic>
+      </Button>
+      <Button fx:id="switchSourceButton" defaultButton="true" mnemonicParsing="false" onAction="#onSwitchSourceAction" prefWidth="140.0" text="Switch to original" />
+   </children>
+</fx:root>
