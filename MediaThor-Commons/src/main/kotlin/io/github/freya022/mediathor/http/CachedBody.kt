@@ -1,4 +1,4 @@
-package io.github.freya022.mediathor.dl.utils
+package io.github.freya022.mediathor.http
 
 import okhttp3.ResponseBody
 import java.nio.file.Path

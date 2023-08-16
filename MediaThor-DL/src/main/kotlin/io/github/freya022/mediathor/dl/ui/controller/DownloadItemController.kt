@@ -3,8 +3,8 @@ package io.github.freya022.mediathor.dl.ui.controller
 import io.github.freya022.mediathor.dl.Data
 import io.github.freya022.mediathor.dl.DownloaderListener
 import io.github.freya022.mediathor.dl.MediaThorDownloader
-import io.github.freya022.mediathor.dl.ui.*
 import io.github.freya022.mediathor.dl.ui.model.Media
+import io.github.freya022.mediathor.ui.utils.*
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
 import javafx.scene.control.Button

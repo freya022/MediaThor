@@ -1,7 +1,12 @@
 package io.github.freya022.mediathor.dl
 
-import io.github.freya022.mediathor.dl.utils.*
-import io.github.freya022.mediathor.dl.utils.ProgressUtils.addProgressTracking
+import io.github.freya022.mediathor.dl.utils.sharedClient
+import io.github.freya022.mediathor.http.toCachedHttpClient
+import io.github.freya022.mediathor.http.utils.HttpForbiddenException
+import io.github.freya022.mediathor.http.utils.ProgressUtils
+import io.github.freya022.mediathor.http.utils.ProgressUtils.addProgressTracking
+import io.github.freya022.mediathor.http.utils.runCatchingUntil
+import io.github.freya022.mediathor.http.utils.toDispatcher
 import io.github.freya022.mediathor.utils.newExecutor
 import io.lindstrom.m3u8.model.MediaPlaylist
 import io.lindstrom.m3u8.model.MediaSegment
@@ -155,7 +160,7 @@ class MediaThorDownloader private constructor(private val outputPath: Path, priv
         }
 
         suspend fun getMediaPlaylist(masterUrl: String): MediaPlaylist = withContext(Dispatchers.IO) {
-            val masterPlaylist = CachedHttpClient.sharedClient.requestCached(masterUrl, folder = "master_playlist")
+            val masterPlaylist = sharedClient.requestCached(masterUrl, folder = "master_playlist")
                 .byteStream().use {
                     MasterPlaylistParser().readPlaylist(it)
                 }
@@ -166,7 +171,7 @@ class MediaThorDownloader private constructor(private val outputPath: Path, priv
             logger.trace { "Picked variant: $bestVariant" }
 
             val uri = URI(masterUrl).resolve(bestVariant.uri()).toString()
-            return@withContext CachedHttpClient.sharedClient.requestCached(uri, folder = "media_playlist")
+            return@withContext sharedClient.requestCached(uri, folder = "media_playlist")
                 .byteStream().use {
                     MediaPlaylistParser().readPlaylist(it)
                 }

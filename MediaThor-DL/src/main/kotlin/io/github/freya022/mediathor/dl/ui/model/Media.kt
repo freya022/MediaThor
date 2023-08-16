@@ -1,6 +1,10 @@
 package io.github.freya022.mediathor.dl.ui.model
 
-import io.github.freya022.mediathor.dl.utils.*
+import io.github.freya022.mediathor.dl.utils.sharedClient
+import io.github.freya022.mediathor.http.utils.await
+import io.github.freya022.mediathor.http.utils.newCall
+import io.github.freya022.mediathor.http.utils.request
+import io.github.freya022.mediathor.http.utils.runCatchingUntil
 import io.lindstrom.m3u8.model.MediaPlaylist
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -117,7 +121,7 @@ class Media(
         @Suppress("OPT_IN_USAGE")
         suspend fun getSegmentStates(mediaPlaylist: MediaPlaylist): Map<String, SegmentState> =
             withContext(Dispatchers.IO.limitedParallelism(16)) {
-                val client = CachedHttpClient.sharedClient.client.newBuilder()
+                val client = sharedClient.client.newBuilder()
                     .dispatcher(Dispatcher(Executors.newFixedThreadPool(16)))
                     .build()
                 val orderedMap: MutableMap<Int, SegmentState> = ConcurrentSkipListMap()

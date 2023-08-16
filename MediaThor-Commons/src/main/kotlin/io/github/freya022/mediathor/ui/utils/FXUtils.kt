@@ -1,4 +1,4 @@
-package io.github.freya022.mediathor.dl.ui
+package io.github.freya022.mediathor.ui.utils
 
 import javafx.animation.AnimationTimer
 import javafx.fxml.FXMLLoader
@@ -7,6 +7,8 @@ import javafx.scene.control.Labeled
 import kotlinx.coroutines.*
 import mu.two.KotlinLogging
 import kotlin.coroutines.CoroutineContext
+
+private object FXUtils {}
 
 private val logger = KotlinLogging.logger { }
 
@@ -39,7 +41,7 @@ suspend fun <T> withMainContext(block: suspend CoroutineScope.() -> T): T {
 fun <T> loadFxml(controller: T, name: String): T = FXMLLoader().apply {
     setRoot(controller)
     setController(controller)
-}.load(DownloaderMain::class.java.getResourceAsStream("/view/$name.fxml"))
+}.load(FXUtils::class.java.getResourceAsStream("/view/$name.fxml"))
 
 inline fun <R> withAnimationTimer(crossinline action: () -> Unit, block: () -> R): R {
     val animationTimer = object : AnimationTimer() {

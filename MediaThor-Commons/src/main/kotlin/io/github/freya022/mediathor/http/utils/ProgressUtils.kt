@@ -1,6 +1,6 @@
-package io.github.freya022.mediathor.dl.utils
+package io.github.freya022.mediathor.http.utils
 
-import io.github.freya022.mediathor.dl.utils.ProgressUtils.ProgressListener
+import io.github.freya022.mediathor.http.utils.ProgressUtils.ProgressListener
 import okhttp3.*
 import okio.*
 import java.io.IOException

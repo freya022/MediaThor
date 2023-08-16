@@ -2,7 +2,7 @@ package io.github.freya022.mediathor.dl.ui.view
 
 import atlantafx.base.theme.NordDark
 import io.github.freya022.mediathor.dl.ui.controller.DownloadController
-import io.github.freya022.mediathor.dl.ui.withMainContext
+import io.github.freya022.mediathor.ui.utils.withMainContext
 import javafx.application.Application
 import javafx.fxml.FXMLLoader
 import javafx.scene.Parent

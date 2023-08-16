@@ -1,6 +1,7 @@
-package io.github.freya022.mediathor.dl.utils
+package io.github.freya022.mediathor.http
 
-import io.github.freya022.mediathor.dl.Data
+import io.github.freya022.mediathor.http.utils.HttpForbiddenException
+import io.github.freya022.mediathor.http.utils.await
 import io.github.freya022.mediathor.utils.CryptoUtils
 import mu.two.KotlinLogging
 import okhttp3.Call
@@ -32,7 +33,7 @@ class CachedHttpClient(private val cacheFolder: Path, val client: OkHttpClient =
         val filePath = folderPath.resolve(nameHash)
         return when {
             filePath.notExists() -> {
-                logger.debug { "Downloading @ ${request().url}" }
+                io.github.freya022.mediathor.http.logger.debug { "Downloading @ ${request().url}" }
                 await()
                     .also {
                         if (it.code == 403) {
@@ -48,10 +49,6 @@ class CachedHttpClient(private val cacheFolder: Path, val client: OkHttpClient =
             }
             else -> filePath.let { CachedBody(it, lazy { it.readBytes().toResponseBody() }) }
         }
-    }
-
-    companion object {
-        val sharedClient = CachedHttpClient(Data.cacheFolder)
     }
 }
 

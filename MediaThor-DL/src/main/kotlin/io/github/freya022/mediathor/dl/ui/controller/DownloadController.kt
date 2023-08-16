@@ -1,7 +1,7 @@
 package io.github.freya022.mediathor.dl.ui.controller
 
-import io.github.freya022.mediathor.dl.ui.fileChooser
-import io.github.freya022.mediathor.dl.ui.launchMainContext
+import io.github.freya022.mediathor.ui.utils.fileChooser
+import io.github.freya022.mediathor.ui.utils.launchMainContext
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
 import javafx.scene.control.Alert

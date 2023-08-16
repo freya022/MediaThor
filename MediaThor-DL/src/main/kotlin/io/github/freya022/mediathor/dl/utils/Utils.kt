@@ -1,6 +1,6 @@
 package io.github.freya022.mediathor.dl.utils
 
-import okhttp3.Dispatcher
-import java.util.concurrent.ExecutorService
+import io.github.freya022.mediathor.dl.Data
+import io.github.freya022.mediathor.http.CachedHttpClient
 
-fun ExecutorService.toDispatcher() = Dispatcher(this)
+val sharedClient = CachedHttpClient(Data.cacheFolder)

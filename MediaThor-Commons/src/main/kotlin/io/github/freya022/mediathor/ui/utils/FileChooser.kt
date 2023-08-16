@@ -1,4 +1,4 @@
-package io.github.freya022.mediathor.dl.ui
+package io.github.freya022.mediathor.ui.utils
 
 import javafx.stage.FileChooser
 import javafx.stage.FileChooser.ExtensionFilter

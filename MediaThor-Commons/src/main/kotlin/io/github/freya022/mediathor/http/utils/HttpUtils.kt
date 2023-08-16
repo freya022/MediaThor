@@ -1,13 +1,16 @@
-package io.github.freya022.mediathor.dl.utils
+package io.github.freya022.mediathor.http.utils
 
 import kotlinx.coroutines.suspendCancellableCoroutine
 import mu.two.KotlinLogging
 import okhttp3.*
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.io.IOException
+import java.util.concurrent.ExecutorService
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+
+fun ExecutorService.toDispatcher() = Dispatcher(this)
 
 fun Request.Builder.url(url: String, block: HttpUrl.Builder.() -> Unit) {
     url(url.toHttpUrl().newBuilder().apply(block).build())
