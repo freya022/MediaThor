@@ -39,7 +39,7 @@ suspend fun <T> withMainContext(block: suspend CoroutineScope.() -> T): T {
 fun <T> loadFxml(controller: T, name: String): T = FXMLLoader().apply {
     setRoot(controller)
     setController(controller)
-}.load(DownloaderMain::class.java.getResourceAsStream("/io/github/freya022/downloader/ui/view/$name.fxml"))
+}.load(DownloaderMain::class.java.getResourceAsStream("/view/$name.fxml"))
 
 inline fun <R> withAnimationTimer(crossinline action: () -> Unit, block: () -> R): R {
     val animationTimer = object : AnimationTimer() {

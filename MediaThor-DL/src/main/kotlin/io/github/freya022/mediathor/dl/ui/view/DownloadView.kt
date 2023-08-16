@@ -22,7 +22,7 @@ class DownloadView private constructor() {
                 val root: Parent = FXMLLoader().apply {
                     setRoot(controller)
                     setController(controller)
-                }.load(DownloadView::class.java.getResourceAsStream("MediaThorDownloadView.fxml"))
+                }.load(DownloadView::class.java.getResourceAsStream("/DownloadView.fxml"))
 
                 Stage().apply {
                     scene = Scene(root)
