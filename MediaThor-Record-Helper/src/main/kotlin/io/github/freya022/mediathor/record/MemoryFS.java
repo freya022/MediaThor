@@ -12,210 +12,22 @@ import ru.serce.jnrfuse.struct.FileStat;
 import ru.serce.jnrfuse.struct.FuseFileInfo;
 import ru.serce.jnrfuse.struct.Statvfs;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-
-import static java.lang.Math.min;
 import static jnr.ffi.Platform.OS.WINDOWS;
 
 public class MemoryFS extends FuseStubFS {
-    private class MemoryDirectory extends MemoryPath {
-        private List<MemoryPath> contents = new ArrayList<>();
-
-        private MemoryDirectory(String name) {
-            super(name);
-        }
-
-        private MemoryDirectory(String name, MemoryDirectory parent) {
-            super(name, parent);
-        }
-
-        public synchronized void add(MemoryPath p) {
-            contents.add(p);
-            p.parent = this;
-        }
-
-        private synchronized void deleteChild(MemoryPath child) {
-            contents.remove(child);
-        }
-
-        @Override
-        protected MemoryPath find(String path) {
-            if (super.find(path) != null) {
-                return super.find(path);
-            }
-            while (path.startsWith("/")) {
-                path = path.substring(1);
-            }
-            synchronized (this) {
-                if (!path.contains("/")) {
-                    for (MemoryPath p : contents) {
-                        if (p.name.equals(path)) {
-                            return p;
-                        }
-                    }
-                    return null;
-                }
-                String nextName = path.substring(0, path.indexOf("/"));
-                String rest = path.substring(path.indexOf("/"));
-                for (MemoryPath p : contents) {
-                    if (p.name.equals(nextName)) {
-                        return p.find(rest);
-                    }
-                }
-            }
-            return null;
-        }
-
-        @Override
-        protected void getattr(FileStat stat) {
-            stat.st_mode.set(FileStat.S_IFDIR | 0777);
-            stat.st_uid.set(getContext().uid.get());
-            stat.st_gid.set(getContext().gid.get());
-        }
-
-        private synchronized void mkdir(String lastComponent) {
-            contents.add(new MemoryDirectory(lastComponent, this));
-        }
-
-        public synchronized void mkfile(String lastComponent) {
-            contents.add(new MemoryFile(lastComponent, this));
-        }
-
-        public synchronized void read(Pointer buf, FuseFillDir filler) {
-            for (MemoryPath p : contents) {
-                filler.apply(buf, p.name, null, 0);
-            }
-        }
-    }
-
-    private class MemoryFile extends MemoryPath {
-        private ByteBuffer contents = ByteBuffer.allocate(0);
-
-        private MemoryFile(String name) {
-            super(name);
-        }
-
-        private MemoryFile(String name, MemoryDirectory parent) {
-            super(name, parent);
-        }
-
-        public MemoryFile(String name, String text) {
-            super(name);
-            byte[] contentBytes = text.getBytes(StandardCharsets.UTF_8);
-            contents = ByteBuffer.wrap(contentBytes);
-        }
-
-        @Override
-        protected void getattr(FileStat stat) {
-            stat.st_mode.set(FileStat.S_IFREG | 0777);
-            stat.st_size.set(contents.capacity());
-            stat.st_uid.set(getContext().uid.get());
-            stat.st_gid.set(getContext().gid.get());
-        }
-
-        private int read(Pointer buffer, long size, long offset) {
-            int bytesToRead = (int) min(contents.capacity() - offset, size);
-            byte[] bytesRead = new byte[bytesToRead];
-            synchronized (this) {
-                contents.position((int) offset);
-                contents.get(bytesRead, 0, bytesToRead);
-                buffer.put(0, bytesRead, 0, bytesToRead);
-                contents.position(0); // Rewind
-            }
-            return bytesToRead;
-        }
-
-        private synchronized void truncate(long size) {
-            if (size < contents.capacity()) {
-                // Need to create a new, smaller buffer
-                ByteBuffer newContents = ByteBuffer.allocate((int) size);
-                byte[] bytesRead = new byte[(int) size];
-                contents.get(bytesRead);
-                newContents.put(bytesRead);
-                contents = newContents;
-            }
-        }
-
-        private int write(Pointer buffer, long bufSize, long writeOffset) {
-            int maxWriteIndex = (int) (writeOffset + bufSize);
-            byte[] bytesToWrite = new byte[(int) bufSize];
-            synchronized (this) {
-                if (maxWriteIndex > contents.capacity()) {
-                    // Need to create a new, larger buffer
-                    ByteBuffer newContents = ByteBuffer.allocate(Math.max(maxWriteIndex, contents.capacity() * 2));
-                    newContents.put(contents);
-                    contents = newContents;
-                }
-                buffer.get(0, bytesToWrite, 0, (int) bufSize);
-                contents.position((int) writeOffset);
-                contents.put(bytesToWrite);
-                contents.position(0); // Rewind
-            }
-            return (int) bufSize;
-        }
-    }
-
-    private abstract class MemoryPath {
-        private String name;
-        private MemoryDirectory parent;
-
-        private MemoryPath(String name) {
-            this(name, null);
-        }
-
-        private MemoryPath(String name, MemoryDirectory parent) {
-            this.name = name;
-            this.parent = parent;
-        }
-
-        private synchronized void delete() {
-            if (parent != null) {
-                parent.deleteChild(this);
-                parent = null;
-            }
-        }
-
-        protected MemoryPath find(String path) {
-            while (path.startsWith("/")) {
-                path = path.substring(1);
-            }
-            if (path.equals(name) || path.isEmpty()) {
-                return this;
-            }
-            return null;
-        }
-
-        protected abstract void getattr(FileStat stat);
-
-        private void rename(String newName) {
-            while (newName.startsWith("/")) {
-                newName = newName.substring(1);
-            }
-            name = newName;
-        }
-    }
-
-    private MemoryDirectory rootDirectory = new MemoryDirectory("");
+    private final MemoryDirectory rootDirectory = new MemoryDirectory(this, "");
 
     public MemoryFS() {
         // Sprinkle some files around
-        rootDirectory.add(new MemoryFile("Sample file.txt", "Hello there, feel free to look around.\n"));
-        rootDirectory.add(new MemoryDirectory("Sample directory"));
-        MemoryDirectory dirWithFiles = new MemoryDirectory("Directory with files");
+        rootDirectory.add(new MemoryFile(this, "Sample file.txt", "Hello there, feel free to look around.\n"));
+        rootDirectory.add(new MemoryDirectory(this, "Sample directory"));
+        MemoryDirectory dirWithFiles = new MemoryDirectory(this, "Directory with files");
         rootDirectory.add(dirWithFiles);
-        dirWithFiles.add(new MemoryFile("hello.txt", "This is some sample text.\n"));
-        dirWithFiles.add(new MemoryFile("hello again.txt", "This another file with text in it! Oh my!\n"));
-        MemoryDirectory nestedDirectory = new MemoryDirectory("Sample nested directory");
+        dirWithFiles.add(new MemoryFile(this, "hello.txt", "This is some sample text.\n"));
+        dirWithFiles.add(new MemoryFile(this, "hello again.txt", "This another file with text in it! Oh my!\n"));
+        MemoryDirectory nestedDirectory = new MemoryDirectory(this, "Sample nested directory");
         dirWithFiles.add(nestedDirectory);
-        nestedDirectory.add(new MemoryFile("So deep.txt", "Man, I'm like, so deep in this here file structure.\n"));
-    }
-
-    public Path getMountPoint() {
-        return mountPoint;
+        nestedDirectory.add(new MemoryFile(this, "So deep.txt", "Man, I'm like, so deep in this here file structure.\n"));
     }
 
     @Override
