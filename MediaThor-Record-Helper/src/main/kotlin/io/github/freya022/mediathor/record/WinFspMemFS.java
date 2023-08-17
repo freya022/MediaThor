@@ -16,7 +16,7 @@ public class WinFspMemFS extends WinFspStubFS {
     private static final String ROOT_SECURITY_DESCRIPTOR = "O:BAG:BAD:PAR(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;WD)";
     private static final Comparator<String> NATURAL_ORDER = new NaturalOrderComparator();
     private static final long MAX_FILE_NODES = 10240;
-    private static final long MAX_FILE_SIZE = 60 * 1024 * 1024;
+    private static final long MAX_FILE_SIZE = 128 * 1024 * 1024;
 
     private final Path rootPath;
     private final Map<String, MemoryObj> objects;
