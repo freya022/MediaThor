@@ -13,41 +13,49 @@ import java.util.*;
 import java.util.function.Predicate;
 
 public class WinFspMemFS extends WinFspStubFS {
+    public static final int KB = 1024;
+    public static final int MB = KB * KB;
+    public static final int GB = KB * KB * KB;
+
     private static final String ROOT_SECURITY_DESCRIPTOR = "O:BAG:BAD:PAR(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;WD)";
     private static final Comparator<String> NATURAL_ORDER = new NaturalOrderComparator();
-    private static final long MAX_FILE_NODES = 10240;
-    private static final long MAX_FILE_SIZE = 128 * 1024 * 1024;
 
-    private final Path rootPath;
-    private final Map<String, MemoryObj> objects;
+    private static final long MAX_FILE_NODES = 1024;
+
+    private static final Path ROOT_PATH = Path.of("\\").normalize();
+
+    private final int maxFileSize;
+    private final long totalSize;
+    private final Map<String, MemoryObj> objects = new HashMap<>();
 
     private long nextIndexNumber;
     private String volumeLabel;
 
     private final PrintStream verboseOut;
 
-    public WinFspMemFS() throws NTStatusException {
-        this(false);
-    }
+    public WinFspMemFS(String volumeLabel, int maxFileSize, long totalSize, boolean verbose) throws NTStatusException {
+        this.volumeLabel = volumeLabel;
+        this.maxFileSize = maxFileSize;
+        this.totalSize = totalSize;
 
-    public WinFspMemFS(boolean verbose) throws NTStatusException {
-        this.rootPath = Path.of("\\").normalize();
-        this.objects = new HashMap<>();
-        this.objects.put(rootPath.toString(), new DirObj(
+        this.objects.put(ROOT_PATH.toString(), new DirObj(
                 null,
-                rootPath,
+                ROOT_PATH,
                 SecurityDescriptorHandler.securityDescriptorToBytes(ROOT_SECURITY_DESCRIPTOR),
                 null
         ));
 
         this.nextIndexNumber = 1L;
-        this.volumeLabel = "MemFS";
 
         this.verboseOut = verbose ? System.out : new PrintStream(OutputStream.nullOutputStream());
     }
 
     public int getMaxFileSize() {
-        return MAX_FILE_SIZE;
+        return maxFileSize;
+    }
+
+    public long getTotalSize() {
+        return totalSize;
     }
 
     @Override
@@ -112,7 +120,7 @@ public class WinFspMemFS extends WinFspStubFS {
 
             if (objects.size() >= MAX_FILE_NODES)
                 throw new NTStatusException(0xC00002EA); // STATUS_CANNOT_MAKE
-            if (allocationSize > MAX_FILE_SIZE)
+            if (allocationSize > maxFileSize)
                 throw new NTStatusException(0xC000007F); // STATUS_DISK_FULL
 
             MemoryObj obj;
@@ -458,7 +466,7 @@ public class WinFspMemFS extends WinFspStubFS {
             DirObj dir = getDirObject(filePath);
 
             // only add the "." and ".." entries if the directory is not root
-            if (!dir.getPath().equals(rootPath)) {
+            if (!dir.getPath().equals(ROOT_PATH)) {
                 if (marker == null)
                     if (!consumer.test(dir.generateFileInfo(".")))
                         return;
@@ -631,8 +639,8 @@ public class WinFspMemFS extends WinFspStubFS {
 
     private VolumeInfo generateVolumeInfo() {
         return new VolumeInfo(
-                TOTAL_SIZE,
-                TOTAL_SIZE - objects.values().stream().mapToLong(MemoryObj::getFileSize).sum(),
+                totalSize,
+                totalSize - objects.values().stream().mapToLong(MemoryObj::getFileSize).sum(),
                 this.volumeLabel
         );
     }

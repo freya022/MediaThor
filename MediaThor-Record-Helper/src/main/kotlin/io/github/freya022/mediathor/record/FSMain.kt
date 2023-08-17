@@ -5,14 +5,14 @@ import com.github.jnrwinfspteam.jnrwinfsp.service.ServiceRunner
 import kotlin.io.path.Path
 
 object FSMain {
-    val root = Path("X:")
+    val root = Path("O:")
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val memFS = WinFspMemFS(false)
+        val memFS = WinFspMemFS("OBS Volatile Staging", 1 * WinFspMemFS.GB, 4L * WinFspMemFS.GB, false)
 
         ServiceRunner.mountLocalDriveAsService(
-            "WinFpsMemFS",
+            "OBS Volatile FS",
             memFS,
             root,
             MountOptions()
