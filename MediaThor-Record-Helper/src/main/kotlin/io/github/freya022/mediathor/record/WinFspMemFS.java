@@ -46,6 +46,10 @@ public class WinFspMemFS extends WinFspStubFS {
         this.verboseOut = verbose ? System.out : new PrintStream(OutputStream.nullOutputStream());
     }
 
+    public int getMaxFileSize() {
+        return MAX_FILE_SIZE;
+    }
+
     @Override
     public VolumeInfo getVolumeInfo() {
 
@@ -115,7 +119,7 @@ public class WinFspMemFS extends WinFspStubFS {
             if (createOptions.contains(CreateOptions.FILE_DIRECTORY_FILE))
                 obj = new DirObj(parent, filePath, securityDescriptor, reparsePoint);
             else {
-                var file = new FileObj(parent, filePath, securityDescriptor, reparsePoint);
+                var file = new FileObj(this, parent, filePath, securityDescriptor, reparsePoint);
                 file.setAllocationSize(Math.toIntExact(allocationSize));
                 obj = file;
             }

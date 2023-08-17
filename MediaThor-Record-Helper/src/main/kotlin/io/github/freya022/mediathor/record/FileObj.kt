@@ -13,6 +13,7 @@ import kotlin.math.min
 private const val ALLOCATION_UNIT = 512
 
 class FileObj(
+    private val memFS: WinFspMemFS,
     parent: DirObj,
     path: Path,
     securityDescriptor: ByteArray,
@@ -61,7 +62,10 @@ class FileObj(
             // truncate or extend the data buffer
             val newFileSize = min(getFileSize(), newAllocationSize)
             if (data.size < newAllocationSize) {
-                data = data.copyOf(newAllocationSize * 2)
+                if (newAllocationSize > memFS.maxFileSize)
+                    throw NTStatusException(-0x3fffff81) // STATUS_DISK_FULL
+
+                data = data.copyOf(min(newAllocationSize * 2, memFS.maxFileSize))
                 dataSize = data.size
             }
             fileSize = newFileSize
@@ -124,15 +128,3 @@ class FileObj(
         setWriteTime(WinSysTime.now())
     }
 }
-
-//fun Pointer.put(dstOff: Int, src: ByteArrayList, srcOff: Int, len: Int) {
-//    val tmpSrc = ByteArray(len)
-//    src.getElements(srcOff, tmpSrc, 0, tmpSrc.size)
-//    this.put(dstOff.toLong(), tmpSrc, srcOff, len)
-//}
-//
-//fun Pointer.get(srcOff: Long, dst: ByteArrayList, dstOff: Int, len: Int) {
-//    val tmpDst = ByteArray(len)
-//    this.get(srcOff, tmpDst, 0, tmpDst.size)
-//    dst.addElements(dstOff, tmpDst)
-//}
