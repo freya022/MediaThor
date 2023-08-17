@@ -6,11 +6,12 @@ import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ThreadLocalRandom
-import kotlin.concurrent.thread
-import kotlin.io.path.*
+import kotlin.io.path.copyTo
+import kotlin.io.path.deleteExisting
+import kotlin.io.path.outputStream
+import kotlin.io.path.readBytes
 import kotlin.math.min
 import kotlin.random.asKotlinRandom
-import kotlin.system.exitProcess
 import kotlin.time.DurationUnit
 import kotlin.time.measureTime
 import kotlin.time.measureTimedValue
@@ -20,29 +21,14 @@ object Main {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val memFS = MemoryFS()
-        val root = Path("X:\\")
+        val root = FSMain.root
 
-        thread {
-            Thread.sleep(1000)
+        testReadsWrites(root)
 
-            testReadsWrites(root)
-
-            Files.walk(root)
-                .filter { it != root }
-                .sorted(Comparator.reverseOrder())
-                .forEach { it.deleteExisting() }
-
-            println("memFS = $memFS")
-
-            exitProcess(0)
-        }
-
-        try {
-            memFS.mount(root, true, false)
-        } finally {
-            memFS.umount()
-        }
+        Files.walk(root)
+            .filter { it != root }
+            .sorted(Comparator.reverseOrder())
+            .forEach { it.deleteExisting() }
     }
 
     private fun testReadsWrites(root: Path) {
@@ -93,7 +79,7 @@ object Main {
     private fun writeBytes(originalBytes: ByteArray, it: OutputStream) {
         var offset = 0
         while (offset != originalBytes.size) {
-            val toWrite = min(1024 * 1024, originalBytes.size - offset)
+            val toWrite = min(8192, originalBytes.size - offset)
             it.write(originalBytes, offset, toWrite)
             offset += toWrite
         }
