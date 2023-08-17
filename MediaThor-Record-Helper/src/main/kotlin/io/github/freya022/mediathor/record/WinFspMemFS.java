@@ -631,8 +631,8 @@ public class WinFspMemFS extends WinFspStubFS {
 
     private VolumeInfo generateVolumeInfo() {
         return new VolumeInfo(
-                MAX_FILE_NODES * MAX_FILE_SIZE,
-                (MAX_FILE_NODES - objects.size()) * MAX_FILE_SIZE,
+                TOTAL_SIZE,
+                TOTAL_SIZE - objects.values().stream().mapToLong(MemoryObj::getFileSize).sum(),
                 this.volumeLabel
         );
     }
