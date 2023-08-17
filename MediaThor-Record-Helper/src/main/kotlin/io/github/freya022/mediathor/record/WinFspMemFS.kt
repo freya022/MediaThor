@@ -4,8 +4,7 @@ package io.github.freya022.mediathor.record
 import com.github.jnrwinfspteam.jnrwinfsp.api.*
 import com.github.jnrwinfspteam.jnrwinfsp.util.NaturalOrderComparator
 import jnr.ffi.Pointer
-import java.io.OutputStream
-import java.io.PrintStream
+import mu.two.KotlinLogging
 import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
@@ -22,17 +21,18 @@ private val NATURAL_ORDER: Comparator<String> = NaturalOrderComparator()
 private const val MAX_FILE_NODES: Long = 1024
 private val ROOT_PATH = Path.of("\\").normalize()
 
+private val logger = KotlinLogging.logger { }
+
+@OptIn(ExperimentalStdlibApi::class)
 class WinFspMemFS(
     private var volumeLabel: String,
     val maxFileSize: Int,
-    val totalSize: Long,
-    verbose: Boolean
+    val totalSize: Long
 ) : WinFspStubFS() {
     private val lock = ReentrantLock()
     private val objects: MutableMap<String, MemoryObj> = hashMapOf()
 
     private var nextIndexNumber: Long = 1L
-    private val verboseOut: PrintStream
 
     init {
         objects[ROOT_PATH.toString()] = DirObj(
@@ -41,24 +41,24 @@ class WinFspMemFS(
             SecurityDescriptorHandler.securityDescriptorToBytes(ROOT_SECURITY_DESCRIPTOR),
             null
         )
-        verboseOut = if (verbose) System.out else PrintStream(OutputStream.nullOutputStream())
     }
 
     override fun getVolumeInfo(): VolumeInfo = lock.withLock {
-        verboseOut.println("== GET VOLUME INFO ==")
-        return generateVolumeInfo()
+        logger.trace("== GET VOLUME INFO ==")
+
+        return logger.exit(generateVolumeInfo())
     }
 
     override fun setVolumeLabel(volumeLabel: String): VolumeInfo = lock.withLock {
-        verboseOut.printf("== SET VOLUME LABEL == %s%n", volumeLabel)
+        logger.trace { "== SET VOLUME LABEL == $volumeLabel" }
 
         this.volumeLabel = volumeLabel
-        return generateVolumeInfo()
+        return logger.exit(generateVolumeInfo())
     }
 
     @Throws(NTStatusException::class)
     override fun getSecurityByName(fileName: String): Optional<SecurityResult> = lock.withLock {
-        verboseOut.printf("== GET SECURITY BY NAME == %s%n", fileName)
+        logger.trace { "== GET SECURITY BY NAME == $fileName" }
 
         val filePath = getPath(fileName)
         if (!hasObject(filePath))
@@ -67,12 +67,13 @@ class WinFspMemFS(
         val obj = getObject(filePath)
         val securityDescriptor = obj.securityDescriptor
         val info = obj.generateFileInfo()
-        verboseOut.printf(
-            "== GET SECURITY BY NAME RETURNED == %s %s%n",
-            SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor), info
-        )
 
-        return Optional.of(SecurityResult(securityDescriptor, EnumSet.copyOf(obj.fileAttributes)))
+        logger.trace {
+            val securityDescriptorStr = SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)
+            "== GET SECURITY BY NAME RETURNED == $securityDescriptorStr $info"
+        }
+
+        return logger.exit(Optional.of(SecurityResult(securityDescriptor, EnumSet.copyOf(obj.fileAttributes))))
     }
 
     @Throws(NTStatusException::class)
@@ -85,11 +86,11 @@ class WinFspMemFS(
         allocationSize: Long,
         reparsePoint: ReparsePoint?
     ): FileInfo = lock.withLock {
-        verboseOut.printf(
-            "== CREATE == %s co=%s ga=%X fa=%s sd=%s as=%d rp=%s%n",
-            fileName, createOptions, grantedAccess, fileAttributes,
-            SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor), allocationSize, reparsePoint
-        )
+        logger.trace {
+            val securityDescriptorStr = SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)
+            "== CREATE == co=$createOptions ga=${grantedAccess.toHexString()} fa=$fileAttributes sd=$securityDescriptorStr as=$allocationSize rp=$reparsePoint"
+        }
+
         val filePath = getPath(fileName)
 
         // Check for duplicate file/folder
@@ -118,9 +119,8 @@ class WinFspMemFS(
         putObject(obj)
 
         val info = obj.generateFileInfo()
-        verboseOut.printf("== CREATE RETURNED == %s%n", info)
 
-        return info
+        return logger.exit(info)
     }
 
     @Throws(NTStatusException::class)
@@ -129,14 +129,12 @@ class WinFspMemFS(
         createOptions: Set<CreateOptions>,
         grantedAccess: Int
     ): FileInfo = lock.withLock {
-        verboseOut.printf("== OPEN == %s co=%s ga=%X%n", fileName, createOptions, grantedAccess)
+        logger.trace { "== OPEN == $fileName co=$createOptions ga=${grantedAccess.toHexString()}" }
+
         val filePath = getPath(fileName)
         val obj = getObject(filePath)
 
-        val info = obj.generateFileInfo()
-        verboseOut.printf("== OPEN RETURNED == %s%n", info)
-
-        return info
+        return logger.exit(obj.generateFileInfo())
     }
 
     @Throws(NTStatusException::class)
@@ -146,10 +144,7 @@ class WinFspMemFS(
         replaceFileAttributes: Boolean,
         allocationSize: Long
     ): FileInfo = lock.withLock {
-        verboseOut.printf(
-            "== OVERWRITE == %s fa=%s replaceFA=%s as=%d%n",
-            fileName, fileAttributes, replaceFileAttributes, allocationSize
-        )
+        logger.trace { "== OVERWRITE == $fileName fa=$fileAttributes replaceFA=$replaceFileAttributes as=$allocationSize" }
 
         val filePath = getPath(fileName)
         val file = getFileObject(filePath)
@@ -167,14 +162,12 @@ class WinFspMemFS(
         file.lastWriteTime = now
         file.changeTime = now
 
-        val info = file.generateFileInfo()
-        verboseOut.printf("== OVERWRITE RETURNED == %s%n", info)
-
-        return info
+        return logger.exit(file.generateFileInfo())
     }
 
     override fun cleanup(ctx: OpenContext, flags: Set<CleanupFlags>): Unit = lock.withLock {
-        verboseOut.printf("== CLEANUP == %s cf=%s%n", ctx, flags)
+        logger.trace { "== CLEANUP == $ctx cf=$flags" }
+
         try {
             val filePath = getPath(ctx.path)
             val memObj = getObject(filePath)
@@ -201,29 +194,29 @@ class WinFspMemFS(
                     return  // abort if trying to remove a non-empty directory
                 removeObject(memObj.path)
 
-                verboseOut.println("== CLEANUP DELETED FILE/DIR ==")
+                logger.trace("== CLEANUP DELETED FILE/DIR ==")
             }
-            verboseOut.println("== CLEANUP RETURNED ==")
+            logger.exit()
         } catch (e: NTStatusException) {
             // we have no way to pass an error status via cleanup
         }
     }
 
     override fun close(ctx: OpenContext): Unit = lock.withLock {
-        verboseOut.printf("== CLOSE == %s%n", ctx)
+        logger.trace { "== CLOSE == $ctx" }
+
         //TODO maybe add space reclamation
     }
 
     @Throws(NTStatusException::class)
     override fun read(fileName: String, pBuffer: Pointer, offset: Long, length: Int): Long = lock.withLock {
-        verboseOut.printf("== READ == %s off=%d len=%d%n", fileName, offset, length)
+        logger.trace { "$fileName off=$offset len=$length" }
+
         val filePath = getPath(fileName)
         val file = getFileObject(filePath)
 
         val bytesRead = file.read(pBuffer, offset, length)
-        verboseOut.printf("== READ RETURNED == bytes=%d%n", bytesRead)
-
-        return bytesRead.toLong()
+        return logger.exit(bytesRead.toLong())
     }
 
     @Throws(NTStatusException::class)
@@ -235,10 +228,8 @@ class WinFspMemFS(
         writeToEndOfFile: Boolean,
         constrainedIo: Boolean
     ): WriteResult = lock.withLock {
-        verboseOut.printf(
-            "== WRITE == %s off=%d len=%d writeToEnd=%s constrained=%s%n",
-            fileName, offset, length, writeToEndOfFile, constrainedIo
-        )
+        logger.trace { "$fileName off=$offset len=$length writeToEnd=$writeToEndOfFile constrained=$constrainedIo" }
+
         val filePath = getPath(fileName)
         val file = getFileObject(filePath)
         val bytesTransferred = when {
@@ -247,35 +238,34 @@ class WinFspMemFS(
         }
 
         val info = file.generateFileInfo()
-        verboseOut.printf("== WRITE RETURNED == bytes=%d %s%n", bytesTransferred, info)
 
+        logger.trace { "== WRITE RETURNED == bytes=$bytesTransferred $info" }
         return WriteResult(bytesTransferred, info)
     }
 
     @Throws(NTStatusException::class)
     override fun flush(fileName: String?): FileInfo? = lock.withLock {
-        verboseOut.printf("== FLUSH == %s%n", fileName)
+        logger.trace { "== FLUSH == $fileName" }
+
         if (fileName == null)
             return null // whole volume is being flushed
 
         val filePath = getPath(fileName)
         val obj: MemoryObj = getFileObject(filePath)
 
-        val info = obj.generateFileInfo()
-        verboseOut.printf("== FLUSH RETURNED == %s%n", info)
-
-        return info
+        return logger.exit(obj.generateFileInfo())
     }
 
     @Throws(NTStatusException::class)
     override fun getFileInfo(ctx: OpenContext): FileInfo = lock.withLock {
-        verboseOut.printf("== GET FILE INFO == %s%n", ctx)
+        logger.trace { "== GET FILE INFO == $ctx" }
+
         val filePath = getPath(ctx.path)
         val obj = getObject(filePath)
 
         val info = obj.generateFileInfo()
-        verboseOut.printf("== GET FILE INFO RETURNED == %s%n", info)
 
+        logger.trace { "== GET FILE INFO RETURNED == $info" }
         return info
     }
 
@@ -288,10 +278,8 @@ class WinFspMemFS(
         lastWriteTime: WinSysTime,
         changeTime: WinSysTime
     ): FileInfo = lock.withLock {
-        verboseOut.printf(
-            "== SET BASIC INFO == %s fa=%s ct=%s ac=%s wr=%s ch=%s%n",
-            ctx, fileAttributes, creationTime, lastAccessTime, lastWriteTime, changeTime
-        )
+        logger.trace { "== SET BASIC INFO == $ctx fa=$fileAttributes ct=$creationTime ac=$lastAccessTime wr=$lastWriteTime ch=$changeTime" }
+
         val filePath = getPath(ctx.path)
         val obj = getObject(filePath)
 
@@ -309,15 +297,13 @@ class WinFspMemFS(
         if (changeTime.get() != 0L)
             obj.changeTime = changeTime
 
-        val info = obj.generateFileInfo()
-        verboseOut.printf("== SET BASIC INFO RETURNED == %s%n", info)
-
-        return info
+        return logger.exit(obj.generateFileInfo())
     }
 
     @Throws(NTStatusException::class)
     override fun setFileSize(fileName: String, newSize: Long, setAllocationSize: Boolean): FileInfo = lock.withLock {
-        verboseOut.printf("== SET FILE SIZE == %s size=%d setAlloc=%s%n", fileName, newSize, setAllocationSize)
+        logger.trace { "== SET FILE SIZE == $fileName size=$newSize setAlloc=$setAllocationSize" }
+
         val filePath = getPath(fileName)
         val file = getFileObject(filePath)
 
@@ -327,27 +313,26 @@ class WinFspMemFS(
             file.setFileSize(Math.toIntExact(newSize))
         }
 
-        val info = file.generateFileInfo()
-        verboseOut.printf("== SET FILE SIZE RETURNED == %s%n", info)
-
-        return info
+        return logger.exit(file.generateFileInfo())
     }
 
     @Throws(NTStatusException::class)
     override fun canDelete(ctx: OpenContext): Unit = lock.withLock {
-        verboseOut.printf("== CAN DELETE == %s%n", ctx)
+        logger.trace { "== CAN DELETE == $ctx" }
+
         val filePath = getPath(ctx.path)
         val memObj = getObject(filePath)
 
         if (isNotEmptyDirectory(memObj))
             throw NTStatusException(-0x3ffffeff) // STATUS_DIRECTORY_NOT_EMPTY
 
-        verboseOut.println("== CAN DELETE RETURNED ==")
+        logger.exit()
     }
 
     @Throws(NTStatusException::class)
     override fun rename(ctx: OpenContext, oldFileName: String, newFileName: String, replaceIfExists: Boolean): Unit = lock.withLock {
-        verboseOut.printf("== RENAME == %s -> %s%n", oldFileName, newFileName)
+        logger.trace { "== RENAME == $oldFileName -> $newFileName" }
+
         val oldFilePath = getPath(oldFileName)
         val newFilePath = getPath(newFileName)
 
@@ -372,36 +357,31 @@ class WinFspMemFS(
             }
         }
 
-        verboseOut.println("== RENAME RETURNED ==")
+        logger.exit()
     }
 
     @Throws(NTStatusException::class)
     override fun getSecurity(ctx: OpenContext): ByteArray = lock.withLock {
-        verboseOut.printf("== GET SECURITY == %s%n", ctx)
+        logger.trace { "== GET SECURITY == $ctx" }
+
         val filePath = getPath(ctx.path)
         val memObj = getObject(filePath)
 
         val securityDescriptor = memObj.securityDescriptor
-        verboseOut.printf(
-            "== GET SECURITY RETURNED == %s%n",
-            SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)
-        )
 
+        logger.trace { "== GET SECURITY RETURNED == ${SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)}" }
         return securityDescriptor
     }
 
     @Throws(NTStatusException::class)
     override fun setSecurity(ctx: OpenContext, securityDescriptor: ByteArray): Unit = lock.withLock {
-        verboseOut.printf(
-            "== SET SECURITY == %s sd=%s%n",
-            ctx,
-            SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)
-        )
+        logger.trace { "== SET SECURITY == $ctx sd=${SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)}" }
+
         val filePath = getPath(ctx.path)
         val memObj = getObject(filePath)
         memObj.securityDescriptor = securityDescriptor
 
-        verboseOut.println("== SET SECURITY RETURNED ==")
+        logger.exit()
     }
 
     @Throws(NTStatusException::class)
@@ -410,10 +390,11 @@ class WinFspMemFS(
         pattern: String?,
         marker: String?,
         consumer: Predicate<FileInfo>
-    ): Unit = lock.withLock{
+    ): Unit = lock.withLock {
+        logger.trace { "== READ DIRECTORY == $fileName pa=$pattern ma=$marker" }
+
         var marker: String? = marker
 
-        verboseOut.printf("== READ DIRECTORY == %s pa=%s ma=%s%n", fileName, pattern, marker)
         val filePath = getPath(fileName)
         val dir = getDirObject(filePath)
 
@@ -438,26 +419,27 @@ class WinFspMemFS(
             .map { obj -> obj.generateFileInfo(obj.name) }
             .takeWhile(consumer::test)
             .forEach { _ -> }
+
+        logger.exit()
     }
 
     @Throws(NTStatusException::class)
     override fun getDirInfoByName(parentDirName: String, fileName: String): FileInfo = lock.withLock {
-        verboseOut.printf("== GET DIR INFO BY NAME == %s / %s%n", parentDirName, fileName)
+        logger.trace { "== GET DIR INFO BY NAME == $parentDirName / $fileName" }
+
         val parentDirPath = getPath(parentDirName)
         getDirObject(parentDirPath) // ensure parent directory exists
 
         val filePath = parentDirPath.resolve(fileName).normalize()
         val memObj = getObject(filePath)
 
-        val info = memObj.generateFileInfo(memObj.name)
-        verboseOut.printf("== GET DIR INFO BY NAME RETURNED == %s%n", info)
-
-        return info
+        return logger.exit(memObj.generateFileInfo(memObj.name))
     }
 
     @Throws(NTStatusException::class)
     override fun getReparsePointData(ctx: OpenContext): ByteArray = lock.withLock {
-        verboseOut.printf("== GET REPARSE POINT DATA == %s%n", ctx)
+        logger.trace { "== GET REPARSE POINT DATA == $ctx" }
+
         val filePath = getPath(ctx.path)
         val memObj = getObject(filePath)
 
@@ -465,17 +447,15 @@ class WinFspMemFS(
             throw NTStatusException(-0x3ffffd8b) // STATUS_NOT_A_REPARSE_POINT
 
         val reparseData = memObj.reparseData ?: throw AssertionError("Should have thrown NTStatusException")
-        verboseOut.printf("== GET REPARSE POINT DATA RETURNED == %s%n", reparseData.contentToString())
 
+        logger.trace { "== GET REPARSE POINT DATA RETURNED == ${reparseData.contentToString()}" }
         return reparseData
     }
 
     @Throws(NTStatusException::class)
     override fun setReparsePoint(ctx: OpenContext, reparseData: ByteArray, reparseTag: Int): Unit = lock.withLock {
-        verboseOut.printf(
-            "== SET REPARSE POINT == %s rd=%s rt=%d%n",
-            ctx, reparseData.contentToString(), reparseTag
-        )
+        logger.trace { "== SET REPARSE POINT == $ctx rd=${reparseData.contentToString()} rt=$reparseTag" }
+
         val filePath = getPath(ctx.path)
         val memObj = getObject(filePath)
 
@@ -485,11 +465,14 @@ class WinFspMemFS(
         memObj.reparseData = reparseData
         memObj.reparseTag = reparseTag
         memObj.fileAttributes += FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT
+
+        logger.exit()
     }
 
     @Throws(NTStatusException::class)
     override fun deleteReparsePoint(ctx: OpenContext): Unit = lock.withLock {
-        verboseOut.printf("== DELETE REPARSE POINT == %s%n", ctx)
+        logger.trace { "== DELETE REPARSE POINT == $ctx" }
+
         val filePath = getPath(ctx.path)
         val memObj = getObject(filePath)
 
@@ -499,6 +482,8 @@ class WinFspMemFS(
         memObj.reparseData = null
         memObj.reparseTag = 0
         memObj.fileAttributes.remove(FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT)
+
+        logger.exit()
     }
 
     private fun isNotEmptyDirectory(dir: MemoryObj): Boolean {
