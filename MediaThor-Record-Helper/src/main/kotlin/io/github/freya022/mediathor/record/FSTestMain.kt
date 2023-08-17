@@ -16,7 +16,7 @@ import kotlin.time.DurationUnit
 import kotlin.time.measureTime
 import kotlin.time.measureTimedValue
 
-object Main {
+object FSTestMain {
     private val logger = KotlinLogging.logger { }
 
     @JvmStatic
