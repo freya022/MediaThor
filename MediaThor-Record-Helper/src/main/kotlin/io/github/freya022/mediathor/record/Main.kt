@@ -1,11 +1,15 @@
 package io.github.freya022.mediathor.record
 
 import mu.two.KotlinLogging
+import java.io.ByteArrayOutputStream
+import java.io.OutputStream
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.concurrent.ThreadLocalRandom
 import kotlin.concurrent.thread
-import kotlin.io.path.Path
-import kotlin.io.path.copyTo
-import kotlin.io.path.readBytes
-import kotlin.io.path.writeText
+import kotlin.io.path.*
+import kotlin.math.min
+import kotlin.random.asKotlinRandom
 import kotlin.system.exitProcess
 import kotlin.time.DurationUnit
 import kotlin.time.measureTime
@@ -17,38 +21,19 @@ object Main {
     @JvmStatic
     fun main(args: Array<String>) {
         val memFS = MemoryFS()
-        val root = Path("Y:\\")
+        val root = Path("X:\\")
 
         thread {
             Thread.sleep(1000)
 
-            val file = root.resolve("file.txt")
-            val sibling = file.resolveSibling("file (copy).txt")
+            testReadsWrites(root)
 
-            val text = "abcdefghij".repeat(1024 * 1024 * 10)
+            Files.walk(root)
+                .filter { it != root }
+                .sorted(Comparator.reverseOrder())
+                .forEach { it.deleteExisting() }
 
-            logger.info("Writing file")
-            val writeTime = measureTime {
-                file.writeText(text)
-            }
-            logger.info("Wrote file")
-            logger.warn { "Write took ${writeTime.toString(DurationUnit.MILLISECONDS, 3)}" }
-
-            logger.info("Copying file")
-            val copyTime = measureTime {
-                file.copyTo(sibling)
-            }
-            logger.info("Copied file")
-            logger.warn { "Copy took ${copyTime.toString(DurationUnit.MILLISECONDS, 3)}" }
-
-            val (fileText, fileReadDuration) = measureTimedValue { file.readBytes() }
-            val (siblingText, siblingReadDuration) = measureTimedValue { sibling.readBytes() }
-
-            logger.warn { "Read file took ${fileReadDuration.toString(DurationUnit.MILLISECONDS, 3)}" }
-            logger.warn { "Read sibling took ${siblingReadDuration.toString(DurationUnit.MILLISECONDS, 3)}" }
-
-            logger.info("file.readText() == text = ${fileText.decodeToString() == text}")
-            logger.info("file.readText() == sibling.readText() = ${fileText.contentEquals(siblingText)}")
+            println("memFS = $memFS")
 
             exitProcess(0)
         }
@@ -57,6 +42,60 @@ object Main {
             memFS.mount(root, true, false)
         } finally {
             memFS.umount()
+        }
+    }
+
+    private fun testReadsWrites(root: Path) {
+        val file = root.resolve("file.bin")
+        val sibling = file.resolveSibling("file (copy).bin")
+
+        val originalBytes = ThreadLocalRandom.current().asKotlinRandom().nextBytes(1024 * 1024 * 100)
+//        val originalBytes = "abcdefghijklmnopqrs ".repeat(10).encodeToByteArray()
+
+        testBufferedWrite(originalBytes)
+
+        testWrite(file, originalBytes)
+        file.deleteExisting()
+        testWrite(file, originalBytes)
+
+        testCopy(file, sibling)
+
+        val (fileBytes, fileReadDuration) = measureTimedValue { file.readBytes() }
+        val (siblingBytes, siblingReadDuration) = measureTimedValue { sibling.readBytes() }
+
+        logger.warn("Read file took ${fileReadDuration.toString(DurationUnit.MILLISECONDS, 3)}")
+        logger.warn("Read sibling took ${siblingReadDuration.toString(DurationUnit.MILLISECONDS, 3)}")
+
+        logger.info("fileBytes.contentEquals(originalBytes) = ${fileBytes.contentEquals(originalBytes)}")
+        logger.info("fileBytes.contentEquals(siblingBytes) = ${fileBytes.contentEquals(siblingBytes)}")
+    }
+
+    private fun testBufferedWrite(originalBytes: ByteArray) {
+        val testStream = ByteArrayOutputStream()
+        testStream.use { writeBytes(originalBytes, it) }
+        logger.info("Custom buffer works: ${testStream.toByteArray().contentEquals(originalBytes)}")
+    }
+
+    private fun testCopy(file: Path, sibling: Path) {
+        logger.info("Copying file")
+        val copyTime = measureTime { file.copyTo(sibling) }
+        logger.warn("Copy took ${copyTime.toString(DurationUnit.MILLISECONDS, 3)}")
+    }
+
+    private fun testWrite(file: Path, originalBytes: ByteArray) {
+        logger.info("Writing file")
+        val writeTime = measureTime {
+            file.outputStream().use { writeBytes(originalBytes, it) }
+        }
+        logger.warn("Write took ${writeTime.toString(DurationUnit.MILLISECONDS, 3)}")
+    }
+
+    private fun writeBytes(originalBytes: ByteArray, it: OutputStream) {
+        var offset = 0
+        while (offset != originalBytes.size) {
+            val toWrite = min(1024 * 1024, originalBytes.size - offset)
+            it.write(originalBytes, offset, toWrite)
+            offset += toWrite
         }
     }
 }
