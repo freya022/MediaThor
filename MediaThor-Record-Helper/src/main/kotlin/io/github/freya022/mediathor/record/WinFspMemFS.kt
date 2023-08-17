@@ -11,10 +11,6 @@ import java.util.concurrent.locks.ReentrantLock
 import java.util.function.Predicate
 import kotlin.concurrent.withLock
 
-const val KB = 1024
-const val MB = KB * KB
-const val GB = KB * KB * KB
-
 private const val ROOT_SECURITY_DESCRIPTOR = "O:BAG:BAD:PAR(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;WD)"
 private val NATURAL_ORDER: Comparator<String> = NaturalOrderComparator()
 
@@ -69,7 +65,7 @@ class WinFspMemFS(
         val info = obj.generateFileInfo()
 
         logger.trace {
-            val securityDescriptorStr = SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)
+            val securityDescriptorStr = obj.getSecurityDescriptorAsString()
             "== GET SECURITY BY NAME RETURNED == $securityDescriptorStr $info"
         }
 
@@ -87,7 +83,7 @@ class WinFspMemFS(
         reparsePoint: ReparsePoint?
     ): FileInfo = lock.withLock {
         logger.trace {
-            val securityDescriptorStr = SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)
+            val securityDescriptorStr = securityDescriptor.decodeSecurityDescriptorToString()
             "== CREATE == co=$createOptions ga=${grantedAccess.toHexString()} fa=$fileAttributes sd=$securityDescriptorStr as=$allocationSize rp=$reparsePoint"
         }
 
@@ -369,13 +365,13 @@ class WinFspMemFS(
 
         val securityDescriptor = memObj.securityDescriptor
 
-        logger.trace { "== GET SECURITY RETURNED == ${SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)}" }
+        logger.trace { "== GET SECURITY RETURNED == ${securityDescriptor.decodeSecurityDescriptorToString()}" }
         return securityDescriptor
     }
 
     @Throws(NTStatusException::class)
     override fun setSecurity(ctx: OpenContext, securityDescriptor: ByteArray): Unit = lock.withLock {
-        logger.trace { "== SET SECURITY == $ctx sd=${SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)}" }
+        logger.trace { "== SET SECURITY == $ctx sd=${securityDescriptor.decodeSecurityDescriptorToString()}" }
 
         val filePath = getPath(ctx.path)
         val memObj = getObject(filePath)

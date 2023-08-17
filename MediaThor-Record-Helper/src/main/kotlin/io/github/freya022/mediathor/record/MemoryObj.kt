@@ -2,10 +2,7 @@
 
 package io.github.freya022.mediathor.record
 
-import com.github.jnrwinfspteam.jnrwinfsp.api.FileAttributes
-import com.github.jnrwinfspteam.jnrwinfsp.api.FileInfo
-import com.github.jnrwinfspteam.jnrwinfsp.api.ReparsePoint
-import com.github.jnrwinfspteam.jnrwinfsp.api.WinSysTime
+import com.github.jnrwinfspteam.jnrwinfsp.api.*
 import java.nio.file.Path
 import java.util.*
 
@@ -66,3 +63,5 @@ sealed class MemoryObj(
     }
 }
 
+fun MemoryObj.getSecurityDescriptorAsString(): String = SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)
+fun ByteArray.decodeSecurityDescriptorToString(): String = SecurityDescriptorHandler.securityDescriptorToString(this)

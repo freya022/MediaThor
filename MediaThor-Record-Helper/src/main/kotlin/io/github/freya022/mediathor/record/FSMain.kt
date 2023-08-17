@@ -5,6 +5,10 @@ import com.github.jnrwinfspteam.jnrwinfsp.service.ServiceRunner
 import kotlin.io.path.Path
 
 object FSMain {
+    private const val KB = 1024
+    private const val MB = KB * KB
+    private const val GB = KB * KB * KB
+
     val root = Path("O:")
 
     @JvmStatic
