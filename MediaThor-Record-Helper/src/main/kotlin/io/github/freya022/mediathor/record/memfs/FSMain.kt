@@ -1,4 +1,4 @@
-package io.github.freya022.mediathor.record
+package io.github.freya022.mediathor.record.memfs
 
 import com.github.jnrwinfspteam.jnrwinfsp.api.MountOptions
 import com.github.jnrwinfspteam.jnrwinfsp.service.ServiceRunner

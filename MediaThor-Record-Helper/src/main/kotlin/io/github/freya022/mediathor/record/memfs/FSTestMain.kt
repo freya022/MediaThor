@@ -1,4 +1,4 @@
-package io.github.freya022.mediathor.record
+package io.github.freya022.mediathor.record.memfs
 
 import mu.two.KotlinLogging
 import java.io.ByteArrayOutputStream
