@@ -1,11 +1,11 @@
+// Originally from https://github.com/jnr-winfsp-team/jnr-winfsp/blob/c7be8901e8f983a91eea19f84dc373373885aa93/src/main/java/com/github/jnrwinfspteam/jnrwinfsp/memfs/FileObj.java
+
 package io.github.freya022.mediathor.record
 
 import com.github.jnrwinfspteam.jnrwinfsp.api.FileAttributes
 import com.github.jnrwinfspteam.jnrwinfsp.api.NTStatusException
 import com.github.jnrwinfspteam.jnrwinfsp.api.ReparsePoint
 import com.github.jnrwinfspteam.jnrwinfsp.api.WinSysTime
-import com.github.jnrwinfspteam.jnrwinfsp.memfs.DirObj
-import com.github.jnrwinfspteam.jnrwinfsp.memfs.MemoryObj
 import jnr.ffi.Pointer
 import java.nio.file.Path
 import kotlin.math.min
@@ -21,25 +21,21 @@ class FileObj(
 ) : MemoryObj(parent, path, securityDescriptor, reparsePoint) {
     private var data = ByteArray(0)
     private var dataSize = 0
-    private var fileSize: Int = 0
+
+    @get:Synchronized
+    override val allocationSize get() = dataSize
+
+    @get:Synchronized
+    override var fileSize: Int = 0
+        private set
 
     init {
         fileAttributes += FileAttributes.FILE_ATTRIBUTE_ARCHIVE
     }
 
     @Synchronized
-    override fun getAllocationSize(): Int {
-        return dataSize
-    }
-
-    @Synchronized
-    override fun getFileSize(): Int {
-        return fileSize
-    }
-
-    @Synchronized
     fun setFileSize(fileSize: Int) {
-        val prevFileSize = getFileSize()
+        val prevFileSize = this.fileSize
         if (fileSize < prevFileSize) {
             for (i in fileSize..<prevFileSize) {
                 data[i] = 0.toByte()
@@ -53,14 +49,14 @@ class FileObj(
     @Synchronized
     fun adaptAllocationSize(fileSize: Int) {
         val units = (Math.addExact(fileSize, ALLOCATION_UNIT) - 1) / ALLOCATION_UNIT
-        allocationSize = units * ALLOCATION_UNIT
+        setAllocationSize(units * ALLOCATION_UNIT)
     }
 
     @Synchronized
     fun setAllocationSize(newAllocationSize: Int) {
         if (newAllocationSize != allocationSize) {
             // truncate or extend the data buffer
-            val newFileSize = min(getFileSize(), newAllocationSize)
+            val newFileSize = min(this.fileSize, newAllocationSize)
             if (data.size < newAllocationSize) {
                 if (newAllocationSize > memFS.maxFileSize)
                     throw NTStatusException(-0x3fffff81) // STATUS_DISK_FULL
@@ -76,10 +72,10 @@ class FileObj(
     @Throws(NTStatusException::class)
     fun read(buffer: Pointer, offsetL: Long, size: Int): Int {
         val offset = Math.toIntExact(offsetL)
-        if (offset >= getFileSize())
+        if (offset >= this.fileSize)
             throw NTStatusException(-0x3fffffef) // STATUS_END_OF_FILE
 
-        val bytesToRead = min(getFileSize() - offset, size)
+        val bytesToRead = min(this.fileSize - offset, size)
         buffer.put(0, data, offset, bytesToRead)
 
         setReadTime()
@@ -91,10 +87,10 @@ class FileObj(
     fun write(buffer: Pointer, offsetL: Long, size: Int, writeToEndOfFile: Boolean): Int {
         var begOffset = Math.toIntExact(offsetL)
         if (writeToEndOfFile)
-            begOffset = getFileSize()
+            begOffset = this.fileSize
 
         val endOffset = Math.addExact(begOffset, size)
-        if (endOffset > getFileSize())
+        if (endOffset > this.fileSize)
             setFileSize(endOffset)
 
         buffer.get(0, data, begOffset, size)
@@ -107,10 +103,10 @@ class FileObj(
     @Synchronized
     fun constrainedWrite(buffer: Pointer, offsetL: Long, size: Int): Int {
         val begOffset = Math.toIntExact(offsetL)
-        if (begOffset >= getFileSize())
+        if (begOffset >= this.fileSize)
             return 0
 
-        val endOffset = min(getFileSize(), Math.addExact(begOffset, size))
+        val endOffset = min(this.fileSize, Math.addExact(begOffset, size))
         val transferredLength = endOffset - begOffset
 
         buffer.get(0, data, begOffset, transferredLength)
@@ -121,10 +117,10 @@ class FileObj(
     }
 
     private fun setReadTime() {
-        setAccessTime(WinSysTime.now())
+        lastAccessTime = WinSysTime.now()
     }
 
     private fun setWriteTime() {
-        setWriteTime(WinSysTime.now())
+        lastWriteTime = WinSysTime.now()
     }
 }

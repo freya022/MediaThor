@@ -1,8 +1,8 @@
+// Originally from https://github.com/jnr-winfsp-team/jnr-winfsp/blob/c7be8901e8f983a91eea19f84dc373373885aa93/src/main/java/com/github/jnrwinfspteam/jnrwinfsp/memfs/WinFspMemFS.java
+
 package io.github.freya022.mediathor.record;
 
 import com.github.jnrwinfspteam.jnrwinfsp.api.*;
-import com.github.jnrwinfspteam.jnrwinfsp.memfs.DirObj;
-import com.github.jnrwinfspteam.jnrwinfsp.memfs.MemoryObj;
 import com.github.jnrwinfspteam.jnrwinfsp.util.NaturalOrderComparator;
 import jnr.ffi.Pointer;
 
@@ -182,8 +182,8 @@ public class WinFspMemFS extends WinFspStubFS {
             file.setFileSize(0);
 
             WinSysTime now = WinSysTime.now();
-            file.setAccessTime(now);
-            file.setWriteTime(now);
+            file.setLastAccessTime(now);
+            file.setLastWriteTime(now);
             file.setChangeTime(now);
 
             FileInfo info = file.generateFileInfo();
@@ -208,10 +208,10 @@ public class WinFspMemFS extends WinFspStubFS {
                 WinSysTime now = WinSysTime.now();
 
                 if (flags.contains(CleanupFlags.SET_LAST_ACCESS_TIME))
-                    memObj.setAccessTime(now);
+                    memObj.setLastAccessTime(now);
 
                 if (flags.contains(CleanupFlags.SET_LAST_WRITE_TIME))
-                    memObj.setWriteTime(now);
+                    memObj.setLastWriteTime(now);
 
                 if (flags.contains(CleanupFlags.SET_CHANGE_TIME))
                     memObj.setChangeTime(now);
@@ -236,6 +236,7 @@ public class WinFspMemFS extends WinFspStubFS {
     @Override
     public void close(OpenContext ctx) {
         verboseOut.printf("== CLOSE == %s%n", ctx);
+        //TODO maybe add space reclamation
     }
 
     @Override
@@ -336,9 +337,9 @@ public class WinFspMemFS extends WinFspStubFS {
             if (creationTime.get() != 0)
                 obj.setCreationTime(creationTime);
             if (lastAccessTime.get() != 0)
-                obj.setAccessTime(lastAccessTime);
+                obj.setLastAccessTime(lastAccessTime);
             if (lastWriteTime.get() != 0)
-                obj.setWriteTime(lastWriteTime);
+                obj.setLastWriteTime(lastWriteTime);
             if (changeTime.get() != 0)
                 obj.setChangeTime(changeTime);
 
