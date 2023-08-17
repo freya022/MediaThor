@@ -1,648 +1,612 @@
 // Originally from https://github.com/jnr-winfsp-team/jnr-winfsp/blob/c7be8901e8f983a91eea19f84dc373373885aa93/src/main/java/com/github/jnrwinfspteam/jnrwinfsp/memfs/WinFspMemFS.java
+package io.github.freya022.mediathor.record
 
-package io.github.freya022.mediathor.record;
+import com.github.jnrwinfspteam.jnrwinfsp.api.*
+import com.github.jnrwinfspteam.jnrwinfsp.util.NaturalOrderComparator
+import jnr.ffi.Pointer
+import java.io.OutputStream
+import java.io.PrintStream
+import java.nio.file.Path
+import java.util.*
+import java.util.function.Predicate
 
-import com.github.jnrwinfspteam.jnrwinfsp.api.*;
-import com.github.jnrwinfspteam.jnrwinfsp.util.NaturalOrderComparator;
-import jnr.ffi.Pointer;
+const val KB = 1024
+const val MB = KB * KB
+const val GB = KB * KB * KB
 
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.nio.file.Path;
-import java.util.*;
-import java.util.function.Predicate;
+private const val ROOT_SECURITY_DESCRIPTOR = "O:BAG:BAD:PAR(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;WD)"
+private val NATURAL_ORDER: Comparator<String> = NaturalOrderComparator()
 
-public class WinFspMemFS extends WinFspStubFS {
-    public static final int KB = 1024;
-    public static final int MB = KB * KB;
-    public static final int GB = KB * KB * KB;
+private const val MAX_FILE_NODES: Long = 1024
+private val ROOT_PATH = Path.of("\\").normalize()
 
-    private static final String ROOT_SECURITY_DESCRIPTOR = "O:BAG:BAD:PAR(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;WD)";
-    private static final Comparator<String> NATURAL_ORDER = new NaturalOrderComparator();
+class WinFspMemFS(
+    private var volumeLabel: String,
+    val maxFileSize: Int,
+    val totalSize: Long,
+    verbose: Boolean
+) : WinFspStubFS() {
+    private val objects: MutableMap<String, MemoryObj> = hashMapOf()
 
-    private static final long MAX_FILE_NODES = 1024;
+    private var nextIndexNumber: Long = 1L
+    private val verboseOut: PrintStream
 
-    private static final Path ROOT_PATH = Path.of("\\").normalize();
-
-    private final int maxFileSize;
-    private final long totalSize;
-    private final Map<String, MemoryObj> objects = new HashMap<>();
-
-    private long nextIndexNumber;
-    private String volumeLabel;
-
-    private final PrintStream verboseOut;
-
-    public WinFspMemFS(String volumeLabel, int maxFileSize, long totalSize, boolean verbose) throws NTStatusException {
-        this.volumeLabel = volumeLabel;
-        this.maxFileSize = maxFileSize;
-        this.totalSize = totalSize;
-
-        this.objects.put(ROOT_PATH.toString(), new DirObj(
-                null,
-                ROOT_PATH,
-                SecurityDescriptorHandler.securityDescriptorToBytes(ROOT_SECURITY_DESCRIPTOR),
-                null
-        ));
-
-        this.nextIndexNumber = 1L;
-
-        this.verboseOut = verbose ? System.out : new PrintStream(OutputStream.nullOutputStream());
+    init {
+        objects[ROOT_PATH.toString()] = DirObj(
+            null,
+            ROOT_PATH,
+            SecurityDescriptorHandler.securityDescriptorToBytes(ROOT_SECURITY_DESCRIPTOR),
+            null
+        )
+        verboseOut = if (verbose) System.out else PrintStream(OutputStream.nullOutputStream())
     }
 
-    public int getMaxFileSize() {
-        return maxFileSize;
+    override fun getVolumeInfo(): VolumeInfo {
+        verboseOut.println("== GET VOLUME INFO ==")
+        synchronized(objects) { return generateVolumeInfo() }
     }
 
-    public long getTotalSize() {
-        return totalSize;
-    }
-
-    @Override
-    public VolumeInfo getVolumeInfo() {
-
-        verboseOut.println("== GET VOLUME INFO ==");
-        synchronized (objects) {
-            return generateVolumeInfo();
+    override fun setVolumeLabel(volumeLabel: String): VolumeInfo {
+        verboseOut.printf("== SET VOLUME LABEL == %s%n", volumeLabel)
+        synchronized(objects) {
+            this.volumeLabel = volumeLabel
+            return generateVolumeInfo()
         }
     }
 
-    @Override
-    public VolumeInfo setVolumeLabel(String volumeLabel) {
-
-        verboseOut.printf("== SET VOLUME LABEL == %s%n", volumeLabel);
-        synchronized (objects) {
-            this.volumeLabel = volumeLabel;
-            return generateVolumeInfo();
-        }
-    }
-
-    @Override
-    public Optional<SecurityResult> getSecurityByName(String fileName) throws NTStatusException {
-        verboseOut.printf("== GET SECURITY BY NAME == %s%n", fileName);
-        synchronized (objects) {
-            Path filePath = getPath(fileName);
+    @Throws(NTStatusException::class)
+    override fun getSecurityByName(fileName: String): Optional<SecurityResult> {
+        verboseOut.printf("== GET SECURITY BY NAME == %s%n", fileName)
+        synchronized(objects) {
+            val filePath = getPath(fileName)
             if (!hasObject(filePath))
-                return Optional.empty();
+                return Optional.empty()
 
-            MemoryObj obj = getObject(filePath);
-            byte[] securityDescriptor = obj.getSecurityDescriptor();
-            FileInfo info = obj.generateFileInfo();
-            verboseOut.printf("== GET SECURITY BY NAME RETURNED == %s %s%n",
-                    SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor), info);
+            val obj = getObject(filePath)
+            val securityDescriptor = obj.securityDescriptor
+            val info = obj.generateFileInfo()
+            verboseOut.printf(
+                "== GET SECURITY BY NAME RETURNED == %s %s%n",
+                SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor), info
+            )
 
-            return Optional.of(new SecurityResult(securityDescriptor, EnumSet.copyOf(obj.getFileAttributes())));
+            return Optional.of(SecurityResult(securityDescriptor, EnumSet.copyOf(obj.fileAttributes)))
         }
     }
 
-    @Override
-    public FileInfo create(String fileName,
-                           Set<CreateOptions> createOptions,
-                           int grantedAccess,
-                           Set<FileAttributes> fileAttributes,
-                           byte[] securityDescriptor,
-                           long allocationSize,
-                           ReparsePoint reparsePoint) throws NTStatusException {
-
-        verboseOut.printf("== CREATE == %s co=%s ga=%X fa=%s sd=%s as=%d rp=%s%n",
-                fileName, createOptions, grantedAccess, fileAttributes,
-                SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor), allocationSize, reparsePoint
-        );
-        synchronized (objects) {
-            Path filePath = getPath(fileName);
+    @Throws(NTStatusException::class)
+    override fun create(
+        fileName: String,
+        createOptions: Set<CreateOptions>,
+        grantedAccess: Int,
+        fileAttributes: Set<FileAttributes>,
+        securityDescriptor: ByteArray,
+        allocationSize: Long,
+        reparsePoint: ReparsePoint?
+    ): FileInfo {
+        verboseOut.printf(
+            "== CREATE == %s co=%s ga=%X fa=%s sd=%s as=%d rp=%s%n",
+            fileName, createOptions, grantedAccess, fileAttributes,
+            SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor), allocationSize, reparsePoint
+        )
+        synchronized(objects) {
+            val filePath = getPath(fileName)
 
             // Check for duplicate file/folder
             if (hasObject(filePath))
-                throw new NTStatusException(0xC0000035); // STATUS_OBJECT_NAME_COLLISION
+                throw NTStatusException(-0x3fffffcb) // STATUS_OBJECT_NAME_COLLISION
 
             // Ensure the parent object exists and is a directory
-            DirObj parent = getParentObject(filePath);
+            val parent = getParentObject(filePath)
 
-            if (objects.size() >= MAX_FILE_NODES)
-                throw new NTStatusException(0xC00002EA); // STATUS_CANNOT_MAKE
+            if (objects.size >= MAX_FILE_NODES)
+                throw NTStatusException(-0x3ffffd16) // STATUS_CANNOT_MAKE
             if (allocationSize > maxFileSize)
-                throw new NTStatusException(0xC000007F); // STATUS_DISK_FULL
+                throw NTStatusException(-0x3fffff81) // STATUS_DISK_FULL
 
-            MemoryObj obj;
-            if (createOptions.contains(CreateOptions.FILE_DIRECTORY_FILE))
-                obj = new DirObj(parent, filePath, securityDescriptor, reparsePoint);
-            else {
-                var file = new FileObj(this, parent, filePath, securityDescriptor, reparsePoint);
-                file.setAllocationSize(Math.toIntExact(allocationSize));
-                obj = file;
+            val obj: MemoryObj = when {
+                CreateOptions.FILE_DIRECTORY_FILE in createOptions ->
+                    DirObj(parent, filePath, securityDescriptor, reparsePoint)
+
+                else ->
+                    FileObj(this, parent, filePath, securityDescriptor, reparsePoint)
+                        .apply { setAllocationSize(Math.toIntExact(allocationSize)) }
             }
 
-            obj.getFileAttributes().addAll(fileAttributes);
-            obj.setIndexNumber(nextIndexNumber++);
-            putObject(obj);
+            obj.fileAttributes.addAll(fileAttributes)
+            obj.indexNumber = nextIndexNumber++
+            putObject(obj)
 
-            FileInfo info = obj.generateFileInfo();
-            verboseOut.printf("== CREATE RETURNED == %s%n", info);
+            val info = obj.generateFileInfo()
+            verboseOut.printf("== CREATE RETURNED == %s%n", info)
 
-            return info;
+            return info
         }
     }
 
-    @Override
-    public FileInfo open(String fileName,
-                         Set<CreateOptions> createOptions,
-                         int grantedAccess) throws NTStatusException {
+    @Throws(NTStatusException::class)
+    override fun open(
+        fileName: String,
+        createOptions: Set<CreateOptions>,
+        grantedAccess: Int
+    ): FileInfo {
+        verboseOut.printf("== OPEN == %s co=%s ga=%X%n", fileName, createOptions, grantedAccess)
+        synchronized(objects) {
+            val filePath = getPath(fileName)
+            val obj = getObject(filePath)
 
-        verboseOut.printf("== OPEN == %s co=%s ga=%X%n", fileName, createOptions, grantedAccess);
-        synchronized (objects) {
-            Path filePath = getPath(fileName);
-            MemoryObj obj = getObject(filePath);
+            val info = obj.generateFileInfo()
+            verboseOut.printf("== OPEN RETURNED == %s%n", info)
 
-            FileInfo info = obj.generateFileInfo();
-            verboseOut.printf("== OPEN RETURNED == %s%n", info);
-
-            return info;
+            return info
         }
     }
 
-    @Override
-    public FileInfo overwrite(String fileName,
-                              Set<FileAttributes> fileAttributes,
-                              boolean replaceFileAttributes,
-                              long allocationSize) throws NTStatusException {
+    @Throws(NTStatusException::class)
+    override fun overwrite(
+        fileName: String,
+        fileAttributes: MutableSet<FileAttributes>,
+        replaceFileAttributes: Boolean,
+        allocationSize: Long
+    ): FileInfo {
+        verboseOut.printf(
+            "== OVERWRITE == %s fa=%s replaceFA=%s as=%d%n",
+            fileName, fileAttributes, replaceFileAttributes, allocationSize
+        )
+        synchronized(objects) {
+            val filePath = getPath(fileName)
+            val file = getFileObject(filePath)
 
-        verboseOut.printf("== OVERWRITE == %s fa=%s replaceFA=%s as=%d%n",
-                fileName, fileAttributes, replaceFileAttributes, allocationSize
-        );
-        synchronized (objects) {
-            Path filePath = getPath(fileName);
-            FileObj file = getFileObject(filePath);
-
-            fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_ARCHIVE);
+            fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_ARCHIVE)
             if (replaceFileAttributes)
-                file.getFileAttributes().clear();
-            file.getFileAttributes().addAll(fileAttributes);
+                file.fileAttributes.clear()
+            file.fileAttributes.addAll(fileAttributes)
 
-            file.setAllocationSize(Math.toIntExact(allocationSize));
-            file.setFileSize(0);
+            file.setAllocationSize(Math.toIntExact(allocationSize))
+            file.setFileSize(0)
 
-            WinSysTime now = WinSysTime.now();
-            file.setLastAccessTime(now);
-            file.setLastWriteTime(now);
-            file.setChangeTime(now);
+            val now = WinSysTime.now()
+            file.lastAccessTime = now
+            file.lastWriteTime = now
+            file.changeTime = now
 
-            FileInfo info = file.generateFileInfo();
-            verboseOut.printf("== OVERWRITE RETURNED == %s%n", info);
+            val info = file.generateFileInfo()
+            verboseOut.printf("== OVERWRITE RETURNED == %s%n", info)
 
-            return info;
+            return info
         }
     }
 
-    @Override
-    public void cleanup(OpenContext ctx, Set<CleanupFlags> flags) {
-
-        verboseOut.printf("== CLEANUP == %s cf=%s%n", ctx, flags);
+    override fun cleanup(ctx: OpenContext, flags: Set<CleanupFlags>) {
+        verboseOut.printf("== CLEANUP == %s cf=%s%n", ctx, flags)
         try {
-            synchronized (objects) {
-                Path filePath = getPath(ctx.getPath());
-                MemoryObj memObj = getObject(filePath);
+            synchronized(objects) {
+                val filePath = getPath(ctx.path)
+                val memObj = getObject(filePath)
 
-                if (flags.contains(CleanupFlags.SET_ARCHIVE_BIT) && memObj instanceof FileObj)
-                    memObj.getFileAttributes().add(FileAttributes.FILE_ATTRIBUTE_ARCHIVE);
+                if (CleanupFlags.SET_ARCHIVE_BIT in flags && memObj is FileObj)
+                    memObj.fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_ARCHIVE)
 
-                WinSysTime now = WinSysTime.now();
+                val now = WinSysTime.now()
 
-                if (flags.contains(CleanupFlags.SET_LAST_ACCESS_TIME))
-                    memObj.setLastAccessTime(now);
+                if (CleanupFlags.SET_LAST_ACCESS_TIME in flags)
+                    memObj.lastAccessTime = now
 
-                if (flags.contains(CleanupFlags.SET_LAST_WRITE_TIME))
-                    memObj.setLastWriteTime(now);
+                if (CleanupFlags.SET_LAST_WRITE_TIME in flags)
+                    memObj.lastWriteTime = now
 
-                if (flags.contains(CleanupFlags.SET_CHANGE_TIME))
-                    memObj.setChangeTime(now);
+                if (CleanupFlags.SET_CHANGE_TIME in flags)
+                    memObj.changeTime = now
 
-                if (flags.contains(CleanupFlags.SET_ALLOCATION_SIZE) && memObj instanceof FileObj)
-                    ((FileObj) memObj).adaptAllocationSize(memObj.getFileSize());
+                if (CleanupFlags.SET_ALLOCATION_SIZE in flags && memObj is FileObj)
+                    memObj.adaptAllocationSize(memObj.fileSize)
 
-                if (flags.contains(CleanupFlags.DELETE)) {
+                if (CleanupFlags.DELETE in flags) {
                     if (isNotEmptyDirectory(memObj))
-                        return; // abort if trying to remove a non-empty directory
-                    removeObject(memObj.getPath());
+                        return  // abort if trying to remove a non-empty directory
+                    removeObject(memObj.path)
 
-                    verboseOut.println("== CLEANUP DELETED FILE/DIR ==");
+                    verboseOut.println("== CLEANUP DELETED FILE/DIR ==")
                 }
-                verboseOut.println("== CLEANUP RETURNED ==");
+                verboseOut.println("== CLEANUP RETURNED ==")
             }
-        } catch (NTStatusException e) {
+        } catch (e: NTStatusException) {
             // we have no way to pass an error status via cleanup
         }
     }
 
-    @Override
-    public void close(OpenContext ctx) {
-        verboseOut.printf("== CLOSE == %s%n", ctx);
+    override fun close(ctx: OpenContext) {
+        verboseOut.printf("== CLOSE == %s%n", ctx)
         //TODO maybe add space reclamation
     }
 
-    @Override
-    public long read(String fileName, Pointer pBuffer, long offset, int length)
-            throws NTStatusException {
+    @Throws(NTStatusException::class)
+    override fun read(fileName: String, pBuffer: Pointer, offset: Long, length: Int): Long {
+        verboseOut.printf("== READ == %s off=%d len=%d%n", fileName, offset, length)
+        synchronized(objects) {
+            val filePath = getPath(fileName)
+            val file = getFileObject(filePath)
 
-        verboseOut.printf("== READ == %s off=%d len=%d%n", fileName, offset, length);
-        synchronized (objects) {
-            Path filePath = getPath(fileName);
-            FileObj file = getFileObject(filePath);
+            val bytesRead = file.read(pBuffer, offset, length)
+            verboseOut.printf("== READ RETURNED == bytes=%d%n", bytesRead)
 
-            int bytesRead = file.read(pBuffer, offset, length);
-            verboseOut.printf("== READ RETURNED == bytes=%d%n", bytesRead);
-
-            return bytesRead;
+            return bytesRead.toLong()
         }
     }
 
-    @Override
-    public WriteResult write(String fileName,
-                             Pointer pBuffer,
-                             long offset,
-                             int length,
-                             boolean writeToEndOfFile,
-                             boolean constrainedIo) throws NTStatusException {
-
-        verboseOut.printf("== WRITE == %s off=%d len=%d writeToEnd=%s constrained=%s%n",
-                fileName, offset, length, writeToEndOfFile, constrainedIo
-        );
-        synchronized (objects) {
-            Path filePath = getPath(fileName);
-            FileObj file = getFileObject(filePath);
-
-            final long bytesTransferred;
-            if (constrainedIo)
-                bytesTransferred = file.constrainedWrite(pBuffer, offset, length);
-            else
-                bytesTransferred = file.write(pBuffer, offset, length, writeToEndOfFile);
-
-            FileInfo info = file.generateFileInfo();
-            verboseOut.printf("== WRITE RETURNED == bytes=%d %s%n", bytesTransferred, info);
-
-            return new WriteResult(bytesTransferred, info);
-        }
-    }
-
-    @Override
-    public FileInfo flush(String fileName) throws NTStatusException {
-        verboseOut.printf("== FLUSH == %s%n", fileName);
-        synchronized (objects) {
-            if (fileName == null)
-                return null; // whole volume is being flushed
-
-            Path filePath = getPath(fileName);
-            MemoryObj obj = getFileObject(filePath);
-
-            FileInfo info = obj.generateFileInfo();
-            verboseOut.printf("== FLUSH RETURNED == %s%n", info);
-
-            return info;
-        }
-    }
-
-    @Override
-    public FileInfo getFileInfo(OpenContext ctx) throws NTStatusException {
-
-        verboseOut.printf("== GET FILE INFO == %s%n", ctx);
-        synchronized (objects) {
-            Path filePath = getPath(ctx.getPath());
-            MemoryObj obj = getObject(filePath);
-
-            FileInfo info = obj.generateFileInfo();
-            verboseOut.printf("== GET FILE INFO RETURNED == %s%n", info);
-
-            return info;
-        }
-    }
-
-    @Override
-    public FileInfo setBasicInfo(OpenContext ctx,
-                                 Set<FileAttributes> fileAttributes,
-                                 WinSysTime creationTime,
-                                 WinSysTime lastAccessTime,
-                                 WinSysTime lastWriteTime,
-                                 WinSysTime changeTime) throws NTStatusException {
-
-        verboseOut.printf("== SET BASIC INFO == %s fa=%s ct=%s ac=%s wr=%s ch=%s%n",
-                ctx, fileAttributes, creationTime, lastAccessTime, lastWriteTime, changeTime
-        );
-        synchronized (objects) {
-            Path filePath = getPath(ctx.getPath());
-            MemoryObj obj = getObject(filePath);
-
-            if (!fileAttributes.contains(FileAttributes.INVALID_FILE_ATTRIBUTES)) {
-                obj.getFileAttributes().clear();
-                obj.getFileAttributes().addAll(fileAttributes);
+    @Throws(NTStatusException::class)
+    override fun write(
+        fileName: String,
+        pBuffer: Pointer,
+        offset: Long,
+        length: Int,
+        writeToEndOfFile: Boolean,
+        constrainedIo: Boolean
+    ): WriteResult {
+        verboseOut.printf(
+            "== WRITE == %s off=%d len=%d writeToEnd=%s constrained=%s%n",
+            fileName, offset, length, writeToEndOfFile, constrainedIo
+        )
+        synchronized(objects) {
+            val filePath = getPath(fileName)
+            val file = getFileObject(filePath)
+            val bytesTransferred = when {
+                constrainedIo -> file.constrainedWrite(pBuffer, offset, length).toLong()
+                else -> file.write(pBuffer, offset, length, writeToEndOfFile).toLong()
             }
-            if (creationTime.get() != 0)
-                obj.setCreationTime(creationTime);
-            if (lastAccessTime.get() != 0)
-                obj.setLastAccessTime(lastAccessTime);
-            if (lastWriteTime.get() != 0)
-                obj.setLastWriteTime(lastWriteTime);
-            if (changeTime.get() != 0)
-                obj.setChangeTime(changeTime);
 
-            FileInfo info = obj.generateFileInfo();
-            verboseOut.printf("== SET BASIC INFO RETURNED == %s%n", info);
+            val info = file.generateFileInfo()
+            verboseOut.printf("== WRITE RETURNED == bytes=%d %s%n", bytesTransferred, info)
 
-            return info;
+            return WriteResult(bytesTransferred, info)
         }
     }
 
-    @Override
-    public FileInfo setFileSize(String fileName, long newSize, boolean setAllocationSize)
-            throws NTStatusException {
+    @Throws(NTStatusException::class)
+    override fun flush(fileName: String?): FileInfo? {
+        verboseOut.printf("== FLUSH == %s%n", fileName)
+        synchronized(objects) {
+            if (fileName == null)
+                return null // whole volume is being flushed
 
-        verboseOut.printf("== SET FILE SIZE == %s size=%d setAlloc=%s%n", fileName, newSize, setAllocationSize);
-        synchronized (objects) {
-            Path filePath = getPath(fileName);
-            FileObj file = getFileObject(filePath);
+            val filePath = getPath(fileName)
+            val obj: MemoryObj = getFileObject(filePath)
 
-            if (setAllocationSize)
-                file.setAllocationSize(Math.toIntExact(newSize));
-            else
-                file.setFileSize(Math.toIntExact(newSize));
+            val info = obj.generateFileInfo()
+            verboseOut.printf("== FLUSH RETURNED == %s%n", info)
 
-            FileInfo info = file.generateFileInfo();
-            verboseOut.printf("== SET FILE SIZE RETURNED == %s%n", info);
-
-            return info;
+            return info
         }
     }
 
-    @Override
-    public void canDelete(OpenContext ctx) throws NTStatusException {
+    @Throws(NTStatusException::class)
+    override fun getFileInfo(ctx: OpenContext): FileInfo {
+        verboseOut.printf("== GET FILE INFO == %s%n", ctx)
+        synchronized(objects) {
+            val filePath = getPath(ctx.path)
+            val obj = getObject(filePath)
 
-        verboseOut.printf("== CAN DELETE == %s%n", ctx);
-        synchronized (objects) {
-            Path filePath = getPath(ctx.getPath());
-            MemoryObj memObj = getObject(filePath);
+            val info = obj.generateFileInfo()
+            verboseOut.printf("== GET FILE INFO RETURNED == %s%n", info)
+
+            return info
+        }
+    }
+
+    @Throws(NTStatusException::class)
+    override fun setBasicInfo(
+        ctx: OpenContext,
+        fileAttributes: Set<FileAttributes>,
+        creationTime: WinSysTime,
+        lastAccessTime: WinSysTime,
+        lastWriteTime: WinSysTime,
+        changeTime: WinSysTime
+    ): FileInfo {
+        verboseOut.printf(
+            "== SET BASIC INFO == %s fa=%s ct=%s ac=%s wr=%s ch=%s%n",
+            ctx, fileAttributes, creationTime, lastAccessTime, lastWriteTime, changeTime
+        )
+        synchronized(objects) {
+            val filePath = getPath(ctx.path)
+            val obj = getObject(filePath)
+
+            if (FileAttributes.INVALID_FILE_ATTRIBUTES !in fileAttributes) {
+                obj.fileAttributes.clear()
+                obj.fileAttributes.addAll(fileAttributes)
+            }
+
+            if (creationTime.get() != 0L)
+                obj.creationTime = creationTime
+            if (lastAccessTime.get() != 0L)
+                obj.lastAccessTime = lastAccessTime
+            if (lastWriteTime.get() != 0L)
+                obj.lastWriteTime = lastWriteTime
+            if (changeTime.get() != 0L)
+                obj.changeTime = changeTime
+
+            val info = obj.generateFileInfo()
+            verboseOut.printf("== SET BASIC INFO RETURNED == %s%n", info)
+
+            return info
+        }
+    }
+
+    @Throws(NTStatusException::class)
+    override fun setFileSize(fileName: String, newSize: Long, setAllocationSize: Boolean): FileInfo {
+        verboseOut.printf("== SET FILE SIZE == %s size=%d setAlloc=%s%n", fileName, newSize, setAllocationSize)
+        synchronized(objects) {
+            val filePath = getPath(fileName)
+            val file = getFileObject(filePath)
+
+            if (setAllocationSize) {
+                file.setAllocationSize(Math.toIntExact(newSize))
+            } else {
+                file.setFileSize(Math.toIntExact(newSize))
+            }
+
+            val info = file.generateFileInfo()
+            verboseOut.printf("== SET FILE SIZE RETURNED == %s%n", info)
+
+            return info
+        }
+    }
+
+    @Throws(NTStatusException::class)
+    override fun canDelete(ctx: OpenContext) {
+        verboseOut.printf("== CAN DELETE == %s%n", ctx)
+        synchronized(objects) {
+            val filePath = getPath(ctx.path)
+            val memObj = getObject(filePath)
 
             if (isNotEmptyDirectory(memObj))
-                throw new NTStatusException(0xC0000101); // STATUS_DIRECTORY_NOT_EMPTY
+                throw NTStatusException(-0x3ffffeff) // STATUS_DIRECTORY_NOT_EMPTY
 
-            verboseOut.println("== CAN DELETE RETURNED ==");
+            verboseOut.println("== CAN DELETE RETURNED ==")
         }
     }
 
-    @Override
-    public void rename(OpenContext ctx, String oldFileName, String newFileName, boolean replaceIfExists)
-            throws NTStatusException {
+    @Throws(NTStatusException::class)
+    override fun rename(ctx: OpenContext, oldFileName: String, newFileName: String, replaceIfExists: Boolean) {
+        verboseOut.printf("== RENAME == %s -> %s%n", oldFileName, newFileName)
+        synchronized(objects) {
+            val oldFilePath = getPath(oldFileName)
+            val newFilePath = getPath(newFileName)
 
-        verboseOut.printf("== RENAME == %s -> %s%n", oldFileName, newFileName);
-        synchronized (objects) {
-            Path oldFilePath = getPath(oldFileName);
-            Path newFilePath = getPath(newFileName);
-
-            if (hasObject(newFilePath) && !oldFileName.equals(newFileName)) {
+            if (hasObject(newFilePath) && oldFileName != newFileName) {
                 if (!replaceIfExists)
-                    throw new NTStatusException(0xC0000035); // STATUS_OBJECT_NAME_COLLISION
+                    throw NTStatusException(-0x3fffffcb) // STATUS_OBJECT_NAME_COLLISION
 
-                MemoryObj newMemObj = getObject(newFilePath);
-                if (newMemObj instanceof DirObj)
-                    throw new NTStatusException(0xC0000022); // STATUS_ACCESS_DENIED
+                val newMemObj = getObject(newFilePath)
+                if (newMemObj is DirObj)
+                    throw NTStatusException(-0x3fffffde) // STATUS_ACCESS_DENIED
             }
 
             // Rename file or directory (and all existing descendants)
-            for (var obj : List.copyOf(objects.values())) {
-                if (obj.getPath().startsWith(oldFilePath)) {
-                    Path relativePath = oldFilePath.relativize(obj.getPath());
-                    Path newObjPath = newFilePath.resolve(relativePath);
-                    MemoryObj newObj = removeObject(obj.getPath());
-                    newObj.setPath(newObjPath);
-                    putObject(newObj);
+            for (obj in objects.values.toList()) {
+                if (obj.path.startsWith(oldFilePath)) {
+                    val relativePath = oldFilePath.relativize(obj.path)
+                    val newObjPath = newFilePath.resolve(relativePath)
+                    val newObj = removeObject(obj.path)
+
+                    newObj!!.path = newObjPath
+                    putObject(newObj)
                 }
             }
 
-            verboseOut.println("== RENAME RETURNED ==");
+            verboseOut.println("== RENAME RETURNED ==")
         }
     }
 
-    @Override
-    public byte[] getSecurity(OpenContext ctx) throws NTStatusException {
+    @Throws(NTStatusException::class)
+    override fun getSecurity(ctx: OpenContext): ByteArray {
+        verboseOut.printf("== GET SECURITY == %s%n", ctx)
+        synchronized(objects) {
+            val filePath = getPath(ctx.path)
+            val memObj = getObject(filePath)
 
-        verboseOut.printf("== GET SECURITY == %s%n", ctx);
-        synchronized (objects) {
-            Path filePath = getPath(ctx.getPath());
-            MemoryObj memObj = getObject(filePath);
-
-            byte[] securityDescriptor = memObj.getSecurityDescriptor();
+            val securityDescriptor = memObj.securityDescriptor
             verboseOut.printf(
-                    "== GET SECURITY RETURNED == %s%n",
-                    SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)
-            );
-
-            return securityDescriptor;
-        }
-    }
-
-    @Override
-    public void setSecurity(OpenContext ctx, byte[] securityDescriptor)
-            throws NTStatusException {
-
-        verboseOut.printf(
-                "== SET SECURITY == %s sd=%s%n",
-                ctx,
+                "== GET SECURITY RETURNED == %s%n",
                 SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)
-        );
-        synchronized (objects) {
-            Path filePath = getPath(ctx.getPath());
-            MemoryObj memObj = getObject(filePath);
-            memObj.setSecurityDescriptor(securityDescriptor);
+            )
 
-            verboseOut.println("== SET SECURITY RETURNED ==");
+            return securityDescriptor
         }
     }
 
-    @Override
-    public void readDirectory(String fileName,
-                              String pattern,
-                              String marker,
-                              Predicate<FileInfo> consumer) throws NTStatusException {
+    @Throws(NTStatusException::class)
+    override fun setSecurity(ctx: OpenContext, securityDescriptor: ByteArray) {
+        verboseOut.printf(
+            "== SET SECURITY == %s sd=%s%n",
+            ctx,
+            SecurityDescriptorHandler.securityDescriptorToString(securityDescriptor)
+        )
+        synchronized(objects) {
+            val filePath = getPath(ctx.path)
+            val memObj = getObject(filePath)
+            memObj.securityDescriptor = securityDescriptor
 
-        verboseOut.printf("== READ DIRECTORY == %s pa=%s ma=%s%n", fileName, pattern, marker);
-        synchronized (objects) {
-            Path filePath = getPath(fileName);
-            DirObj dir = getDirObject(filePath);
+            verboseOut.println("== SET SECURITY RETURNED ==")
+        }
+    }
+
+    @Throws(NTStatusException::class)
+    override fun readDirectory(
+        fileName: String,
+        pattern: String?,
+        marker: String?,
+        consumer: Predicate<FileInfo>
+    ) {
+        var marker: String? = marker
+
+        verboseOut.printf("== READ DIRECTORY == %s pa=%s ma=%s%n", fileName, pattern, marker)
+        synchronized(objects) {
+            val filePath = getPath(fileName)
+            val dir = getDirObject(filePath)
 
             // only add the "." and ".." entries if the directory is not root
-            if (!dir.getPath().equals(ROOT_PATH)) {
+            if (dir.path != ROOT_PATH) {
                 if (marker == null)
                     if (!consumer.test(dir.generateFileInfo(".")))
-                        return;
-                if (marker == null || marker.equals(".")) {
-                    DirObj parentDir = getParentObject(filePath);
+                        return
+                if (marker == null || marker == ".") {
+                    val parentDir = getParentObject(filePath)
                     if (!consumer.test(parentDir.generateFileInfo("..")))
-                        return;
-                    marker = null;
+                        return
+                    marker = null
                 }
             }
 
-            final String finalMarker = marker;
-            objects.values().stream()
-                    .filter(obj -> obj.getParent() != null &&
-                            obj.getParent().getPath().equals(dir.getPath()))
-                    .sorted(Comparator.comparing(MemoryObj::getName, NATURAL_ORDER))
-                    .dropWhile(obj -> isBeforeMarker(obj.getName(), finalMarker))
-                    .map(obj -> obj.generateFileInfo(obj.getName()))
-                    .takeWhile(consumer)
-                    .forEach(o -> {
-                    });
+            val finalMarker = marker
+            objects.values.asSequence()
+                .filter { obj -> obj.parent != null && obj.parent.path == dir.path }
+                .sortedWith(Comparator.comparing(MemoryObj::name, NATURAL_ORDER))
+                .dropWhile { obj -> isBeforeMarker(obj.name, finalMarker) }
+                .map { obj -> obj.generateFileInfo(obj.name) }
+                .takeWhile(consumer::test)
+                .forEach { _ -> }
         }
     }
 
-    private static boolean isBeforeMarker(String name, String marker) {
-        return marker != null && NATURAL_ORDER.compare(name, marker) <= 0;
-    }
+    @Throws(NTStatusException::class)
+    override fun getDirInfoByName(parentDirName: String, fileName: String): FileInfo {
+        verboseOut.printf("== GET DIR INFO BY NAME == %s / %s%n", parentDirName, fileName)
+        synchronized(objects) {
+            val parentDirPath = getPath(parentDirName)
+            getDirObject(parentDirPath) // ensure parent directory exists
 
-    @Override
-    public FileInfo getDirInfoByName(String parentDirName, String fileName)
-            throws NTStatusException {
+            val filePath = parentDirPath.resolve(fileName).normalize()
+            val memObj = getObject(filePath)
 
-        verboseOut.printf("== GET DIR INFO BY NAME == %s / %s%n", parentDirName, fileName);
-        synchronized (objects) {
-            Path parentDirPath = getPath(parentDirName);
-            getDirObject(parentDirPath); // ensure parent directory exists
+            val info = memObj.generateFileInfo(memObj.name)
+            verboseOut.printf("== GET DIR INFO BY NAME RETURNED == %s%n", info)
 
-            Path filePath = parentDirPath.resolve(fileName).normalize();
-            MemoryObj memObj = getObject(filePath);
-
-            FileInfo info = memObj.generateFileInfo(memObj.getName());
-            verboseOut.printf("== GET DIR INFO BY NAME RETURNED == %s%n", info);
-
-            return info;
+            return info
         }
     }
 
-    @Override
-    public byte[] getReparsePointData(OpenContext ctx) throws NTStatusException {
-        verboseOut.printf("== GET REPARSE POINT DATA == %s%n", ctx);
-        synchronized (objects) {
-            Path filePath = getPath(ctx.getPath());
-            MemoryObj memObj = getObject(filePath);
+    @Throws(NTStatusException::class)
+    override fun getReparsePointData(ctx: OpenContext): ByteArray {
+        verboseOut.printf("== GET REPARSE POINT DATA == %s%n", ctx)
+        synchronized(objects) {
+            val filePath = getPath(ctx.path)
+            val memObj = getObject(filePath)
 
-            if (!memObj.getFileAttributes().contains(FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT))
-                throw new NTStatusException(0xC0000275); // STATUS_NOT_A_REPARSE_POINT
+            if (FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT !in memObj.fileAttributes)
+                throw NTStatusException(-0x3ffffd8b) // STATUS_NOT_A_REPARSE_POINT
 
-            byte[] reparseData = memObj.getReparseData();
-            verboseOut.printf("== GET REPARSE POINT DATA RETURNED == %s%n", Arrays.toString(reparseData));
+            val reparseData = memObj.reparseData ?: throw AssertionError("Should have thrown NTStatusException")
+            verboseOut.printf("== GET REPARSE POINT DATA RETURNED == %s%n", reparseData.contentToString())
 
-            return reparseData;
+            return reparseData
         }
     }
 
-    @Override
-    public void setReparsePoint(OpenContext ctx, byte[] reparseData, int reparseTag) throws NTStatusException {
-        verboseOut.printf("== SET REPARSE POINT == %s rd=%s rt=%d%n",
-                ctx, Arrays.toString(reparseData), reparseTag
-        );
-        synchronized (objects) {
-            Path filePath = getPath(ctx.getPath());
-            MemoryObj memObj = getObject(filePath);
+    @Throws(NTStatusException::class)
+    override fun setReparsePoint(ctx: OpenContext, reparseData: ByteArray, reparseTag: Int) {
+        verboseOut.printf(
+            "== SET REPARSE POINT == %s rd=%s rt=%d%n",
+            ctx, reparseData.contentToString(), reparseTag
+        )
+        synchronized(objects) {
+            val filePath = getPath(ctx.path)
+            val memObj = getObject(filePath)
 
             if (isNotEmptyDirectory(memObj))
-                throw new NTStatusException(0xC0000101); // STATUS_DIRECTORY_NOT_EMPTY
+                throw NTStatusException(-0x3ffffeff) // STATUS_DIRECTORY_NOT_EMPTY
 
-            memObj.setReparseData(reparseData);
-            memObj.setReparseTag(reparseTag);
-            memObj.getFileAttributes().add(FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT);
+            memObj.reparseData = reparseData
+            memObj.reparseTag = reparseTag
+            memObj.fileAttributes += FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT
         }
     }
 
-    @Override
-    public void deleteReparsePoint(OpenContext ctx) throws NTStatusException {
-        verboseOut.printf("== DELETE REPARSE POINT == %s%n", ctx);
-        synchronized (objects) {
-            Path filePath = getPath(ctx.getPath());
-            MemoryObj memObj = getObject(filePath);
+    @Throws(NTStatusException::class)
+    override fun deleteReparsePoint(ctx: OpenContext) {
+        verboseOut.printf("== DELETE REPARSE POINT == %s%n", ctx)
+        synchronized(objects) {
+            val filePath = getPath(ctx.path)
+            val memObj = getObject(filePath)
 
-            if (!memObj.getFileAttributes().contains(FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT))
-                throw new NTStatusException(0xC0000275); // STATUS_NOT_A_REPARSE_POINT
+            if (FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT !in memObj.fileAttributes)
+                throw NTStatusException(-0x3ffffd8b) // STATUS_NOT_A_REPARSE_POINT
 
-            memObj.setReparseData(null);
-            memObj.setReparseTag(0);
-            memObj.getFileAttributes().remove(FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT);
+            memObj.reparseData = null
+            memObj.reparseTag = 0
+            memObj.fileAttributes.remove(FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT)
         }
     }
 
-    private boolean isNotEmptyDirectory(MemoryObj dir) {
-        if (dir instanceof DirObj) {
-            for (var obj : objects.values()) {
-                if (obj.getPath().startsWith(dir.getPath())
-                        && !obj.getPath().equals(dir.getPath()))
-                    return true;
-            }
+    private fun isNotEmptyDirectory(dir: MemoryObj): Boolean {
+        if (dir is DirObj) {
+            return objects.values
+                .any { obj -> obj.path.startsWith(dir.path) && obj.path != dir.path }
         }
-
-        return false;
+        return false
     }
 
-    private Path getPath(String filePath) {
-        return Path.of(filePath).normalize();
+    private fun getPath(filePath: String): Path {
+        return Path.of(filePath).normalize()
     }
 
-    private String getPathKey(Path filePath) {
-        return Objects.toString(filePath, null);
-    }
+    private fun getPathKey(filePath: Path): String = filePath.toString()
 
-    private boolean hasObject(Path filePath) {
-        return objects.containsKey(getPathKey(filePath));
-    }
+    private fun hasObject(filePath: Path): Boolean = getPathKey(filePath) in objects
 
-    private MemoryObj getObject(Path filePath) throws NTStatusException {
-        MemoryObj obj = objects.get(getPathKey(filePath));
+    @Throws(NTStatusException::class)
+    private fun getObject(filePath: Path): MemoryObj {
+        val obj = objects[getPathKey(filePath)]
         if (obj == null) {
-            getParentObject(filePath); // may throw exception with different status code
-            throw new NTStatusException(0xC0000034); // STATUS_OBJECT_NAME_NOT_FOUND
+            getParentObject(filePath) // may throw exception with different status code
+            throw NTStatusException(-0x3fffffcc) // STATUS_OBJECT_NAME_NOT_FOUND
         }
-
-        return obj;
+        return obj
     }
 
-    private DirObj getParentObject(Path filePath) throws NTStatusException {
-        MemoryObj parentObj = objects.get(getPathKey(filePath.getParent()));
-        if (parentObj == null)
-            throw new NTStatusException(0xC000003A); // STATUS_OBJECT_PATH_NOT_FOUND
-        if (!(parentObj instanceof DirObj))
-            throw new NTStatusException(0xC0000103); // STATUS_NOT_A_DIRECTORY
+    @Throws(NTStatusException::class)
+    private fun getParentObject(filePath: Path): DirObj {
+        val parentObj = objects[getPathKey(filePath.parent)]
+            ?: throw NTStatusException(-0x3fffffc6) // STATUS_OBJECT_PATH_NOT_FOUND
+        if (parentObj !is DirObj)
+            throw NTStatusException(-0x3ffffefd) // STATUS_NOT_A_DIRECTORY
 
-        return (DirObj) parentObj;
+        return parentObj
     }
 
-    private void putObject(MemoryObj obj) {
-        objects.put(getPathKey(obj.getPath()), obj);
-        obj.touchParent();
+    private fun putObject(obj: MemoryObj) {
+        objects[getPathKey(obj.path)] = obj
+        obj.touchParent()
     }
 
-    private MemoryObj removeObject(Path filePath) {
-        MemoryObj obj = objects.remove(getPathKey(filePath));
-        if (obj != null)
-            obj.touchParent();
-        return obj;
+    private fun removeObject(filePath: Path): MemoryObj? {
+        val obj = objects.remove(getPathKey(filePath))
+        obj?.touchParent()
+        return obj
     }
 
-    private FileObj getFileObject(Path filePath) throws NTStatusException {
-        MemoryObj obj = getObject(filePath);
-        if (!(obj instanceof FileObj))
-            throw new NTStatusException(0xC00000BA); // STATUS_FILE_IS_A_DIRECTORY
-
-        return (FileObj) obj;
+    @Throws(NTStatusException::class)
+    private fun getFileObject(filePath: Path): FileObj {
+        return getObject(filePath) as? FileObj
+            ?: throw NTStatusException(-0x3fffff46) // STATUS_FILE_IS_A_DIRECTORY
     }
 
-    private DirObj getDirObject(Path filePath) throws NTStatusException {
-        MemoryObj obj = getObject(filePath);
-        if (!(obj instanceof DirObj))
-            throw new NTStatusException(0xC0000103); // STATUS_NOT_A_DIRECTORY
-
-        return (DirObj) obj;
+    @Throws(NTStatusException::class)
+    private fun getDirObject(filePath: Path): DirObj {
+        return getObject(filePath) as? DirObj
+            ?: throw NTStatusException(-0x3ffffefd) // STATUS_NOT_A_DIRECTORY
     }
 
-    private VolumeInfo generateVolumeInfo() {
-        return new VolumeInfo(
-                totalSize,
-                totalSize - objects.values().stream().mapToLong(MemoryObj::getFileSize).sum(),
-                this.volumeLabel
-        );
+    private fun generateVolumeInfo(): VolumeInfo {
+        return VolumeInfo(
+            totalSize,
+            totalSize - objects.values.sumOf { it.fileSize },
+            volumeLabel
+        )
+    }
+
+    companion object {
+        private fun isBeforeMarker(name: String, marker: String?): Boolean {
+            return marker != null && NATURAL_ORDER.compare(name, marker) <= 0
+        }
     }
 }

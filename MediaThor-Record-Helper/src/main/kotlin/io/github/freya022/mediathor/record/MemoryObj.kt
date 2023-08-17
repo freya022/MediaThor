@@ -27,8 +27,11 @@ sealed class MemoryObj(
     abstract val allocationSize: Int
     abstract val fileSize: Int
 
-    val name: String?
-        get() = if (path.nameCount > 0) path.fileName.toString() else null
+    val name: String
+        get() = when {
+            path.nameCount > 0 -> path.fileName.toString()
+            else -> throw AssertionError("Getting name on a root ${this.javaClass.simpleName} is not permitted")
+        }
 
     init {
         if (reparsePoint != null) {

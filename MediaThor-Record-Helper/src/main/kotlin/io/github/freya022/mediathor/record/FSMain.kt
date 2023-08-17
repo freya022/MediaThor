@@ -9,7 +9,7 @@ object FSMain {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val memFS = WinFspMemFS("OBS Volatile Staging", 1 * WinFspMemFS.GB, 4L * WinFspMemFS.GB, false)
+        val memFS = WinFspMemFS("OBS Volatile Staging", 1 * GB, 4L * GB, false)
 
         ServiceRunner.mountLocalDriveAsService(
             "OBS Volatile FS",
