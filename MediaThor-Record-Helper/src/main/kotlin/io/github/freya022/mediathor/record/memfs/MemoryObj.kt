@@ -31,7 +31,7 @@ sealed class MemoryObj(
             else -> throw AssertionError("Getting name on a root ${this.javaClass.simpleName} is not permitted")
         }
 
-    val absolutePath: Path get() = Path.of(memFS.mountPoint!!).resolve(fsLocalPath.toString().removePrefix("\\"))
+    val absolutePath: Path get() = Path.of(memFS.mountPoint!!).resolve(fsLocalPath.toString().removePrefix("\\")).toAbsolutePath()
 
     init {
         if (reparsePoint != null) {

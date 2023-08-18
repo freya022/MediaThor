@@ -33,7 +33,7 @@ class WinFspMemFS(
 
     private var nextIndexNumber: Long = 1L
 
-    val mountPointPath: Path get() = Path.of(mountPoint)
+    val mountPointPath: Path get() = Path.of(mountPoint).toAbsolutePath()
 
     init {
         objects[ROOT_PATH.toString()] = DirObj(
