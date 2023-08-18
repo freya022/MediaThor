@@ -7,7 +7,10 @@ import io.github.freya022.mediathor.http.utils.ProgressUtils
 import io.github.freya022.mediathor.http.utils.ProgressUtils.addProgressTracking
 import io.github.freya022.mediathor.http.utils.runCatchingUntil
 import io.github.freya022.mediathor.http.utils.toDispatcher
+import io.github.freya022.mediathor.utils.directory
 import io.github.freya022.mediathor.utils.newExecutor
+import io.github.freya022.mediathor.utils.redirectOutputs
+import io.github.freya022.mediathor.utils.waitFor
 import io.lindstrom.m3u8.model.MediaPlaylist
 import io.lindstrom.m3u8.model.MediaSegment
 import io.lindstrom.m3u8.model.Variant
@@ -75,31 +78,11 @@ class MediaThorDownloader private constructor(private val outputPath: Path, priv
             val errorStream = ByteArrayOutputStream()
 
             ProcessBuilder()
-                .directory(Data.tempDirectory.toFile())
+                .directory(Data.tempDirectory)
                 .command("ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concatListPath.absolutePathString(), "-c", "copy", outputPath.absolutePathString())
                 .start()
-                .also { process ->
-                    launch { redirectStream(outputStream, process.inputStream) }
-                    launch { redirectStream(errorStream, process.errorStream) }
-                }
-                .waitFor()
-                .also {
-                    if (it != 0) {
-                        val outputString = outputStream.toByteArray().decodeToString()
-                        when {
-                            outputString.isNotBlank() -> logger.warn("Output:\n$outputString")
-                            else -> logger.warn("No output")
-                        }
-
-                        val errorString = errorStream.toByteArray().decodeToString()
-                        when {
-                            errorString.isNotBlank() -> logger.error("Error output:\n$errorString")
-                            else -> logger.warn("No error output")
-                        }
-
-                        logger.error { "FFMpeg exited with code: $it" }
-                    }
-                }
+                .redirectOutputs(outputStream, errorStream)
+                .waitFor(logger, outputStream, errorStream)
 
             concatListPath.deleteExisting()
         }
