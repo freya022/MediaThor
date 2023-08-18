@@ -7,8 +7,9 @@ import java.nio.file.Path
 import java.util.*
 
 sealed class MemoryObj(
+    val memFS: WinFspMemFS,
     val parent: MemoryObj?,
-    var path: Path,
+    var fsLocalPath: Path,
     var securityDescriptor: ByteArray,
     reparsePoint: ReparsePoint?
 ) {
@@ -26,9 +27,11 @@ sealed class MemoryObj(
 
     val name: String
         get() = when {
-            path.nameCount > 0 -> path.fileName.toString()
+            fsLocalPath.nameCount > 0 -> fsLocalPath.fileName.toString()
             else -> throw AssertionError("Getting name on a root ${this.javaClass.simpleName} is not permitted")
         }
+
+    val absolutePath: Path get() = Path.of(memFS.mountPoint!!).resolve(fsLocalPath.toString().removePrefix("\\"))
 
     init {
         if (reparsePoint != null) {
@@ -39,7 +42,7 @@ sealed class MemoryObj(
     }
 
     @JvmOverloads
-    fun generateFileInfo(filePath: String = path.toString()): FileInfo = FileInfo(filePath).apply {
+    fun generateFileInfo(filePath: String = fsLocalPath.toString()): FileInfo = FileInfo(filePath).apply {
         fileAttributes += this@MemoryObj.fileAttributes
         allocationSize = this@MemoryObj.allocationSize.toLong()
         fileSize = this@MemoryObj.fileSize.toLong()

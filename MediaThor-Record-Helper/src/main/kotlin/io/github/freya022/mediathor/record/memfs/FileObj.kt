@@ -15,12 +15,12 @@ import kotlin.math.min
 private const val ALLOCATION_UNIT = 512
 
 class FileObj(
-    private val memFS: WinFspMemFS,
+    memFS: WinFspMemFS,
     parent: DirObj,
     path: Path,
     securityDescriptor: ByteArray,
     reparsePoint: ReparsePoint?
-) : MemoryObj(parent, path, securityDescriptor, reparsePoint) {
+) : MemoryObj(memFS, parent, path, securityDescriptor, reparsePoint) {
     private val lock = ReentrantLock()
 
     private var data = ByteArray(0)

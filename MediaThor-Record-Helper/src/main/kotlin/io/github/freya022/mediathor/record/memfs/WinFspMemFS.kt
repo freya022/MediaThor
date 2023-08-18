@@ -33,6 +33,7 @@ class WinFspMemFS(
 
     init {
         objects[ROOT_PATH.toString()] = DirObj(
+            this,
             null,
             ROOT_PATH,
             SecurityDescriptorHandler.securityDescriptorToBytes(ROOT_SECURITY_DESCRIPTOR),
@@ -104,7 +105,7 @@ class WinFspMemFS(
 
         val obj: MemoryObj = when {
             CreateOptions.FILE_DIRECTORY_FILE in createOptions ->
-                DirObj(parent, filePath, securityDescriptor, reparsePoint)
+                DirObj(this, parent, filePath, securityDescriptor, reparsePoint)
 
             else ->
                 FileObj(this, parent, filePath, securityDescriptor, reparsePoint)
@@ -189,7 +190,7 @@ class WinFspMemFS(
             if (CleanupFlags.DELETE in flags) {
                 if (isNotEmptyDirectory(memObj))
                     return  // abort if trying to remove a non-empty directory
-                removeObject(memObj.path)
+                removeObject(memObj.fsLocalPath)
 
                 logger.trace("== CLEANUP DELETED FILE/DIR ==")
             }
@@ -344,12 +345,12 @@ class WinFspMemFS(
 
         // Rename file or directory (and all existing descendants)
         for (obj in objects.values.toList()) {
-            if (obj.path.startsWith(oldFilePath)) {
-                val relativePath = oldFilePath.relativize(obj.path)
+            if (obj.fsLocalPath.startsWith(oldFilePath)) {
+                val relativePath = oldFilePath.relativize(obj.fsLocalPath)
                 val newObjPath = newFilePath.resolve(relativePath)
-                val newObj = removeObject(obj.path)
+                val newObj = removeObject(obj.fsLocalPath)
 
-                newObj!!.path = newObjPath
+                newObj!!.fsLocalPath = newObjPath
                 putObject(newObj)
             }
         }
@@ -396,7 +397,7 @@ class WinFspMemFS(
         val dir = getDirObject(filePath)
 
         // only add the "." and ".." entries if the directory is not root
-        if (dir.path != ROOT_PATH) {
+        if (dir.fsLocalPath != ROOT_PATH) {
             if (marker == null)
                 if (!consumer.test(dir.generateFileInfo(".")))
                     return
@@ -410,7 +411,7 @@ class WinFspMemFS(
 
         val finalMarker = marker
         objects.values.asSequence()
-            .filter { obj -> obj.parent != null && obj.parent.path == dir.path }
+            .filter { obj -> obj.parent != null && obj.parent.fsLocalPath == dir.fsLocalPath }
             .sortedWith(Comparator.comparing(MemoryObj::name, NATURAL_ORDER))
             .dropWhile { obj -> isBeforeMarker(obj.name, finalMarker) }
             .map { obj -> obj.generateFileInfo(obj.name) }
@@ -486,7 +487,7 @@ class WinFspMemFS(
     private fun isNotEmptyDirectory(dir: MemoryObj): Boolean {
         if (dir is DirObj) {
             return objects.values
-                .any { obj -> obj.path.startsWith(dir.path) && obj.path != dir.path }
+                .any { obj -> obj.fsLocalPath.startsWith(dir.fsLocalPath) && obj.fsLocalPath != dir.fsLocalPath }
         }
         return false
     }
@@ -520,7 +521,7 @@ class WinFspMemFS(
     }
 
     private fun putObject(obj: MemoryObj) {
-        objects[getPathKey(obj.path)] = obj
+        objects[getPathKey(obj.fsLocalPath)] = obj
         obj.touchParent()
     }
 

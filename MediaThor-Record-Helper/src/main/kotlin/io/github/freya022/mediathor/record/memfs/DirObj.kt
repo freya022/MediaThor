@@ -7,11 +7,12 @@ import com.github.jnrwinfspteam.jnrwinfsp.api.ReparsePoint
 import java.nio.file.Path
 
 class DirObj(
+    memFS: WinFspMemFS,
     parent: DirObj?,
     path: Path,
     securityDescriptor: ByteArray,
     reparsePoint: ReparsePoint?
-) : MemoryObj(parent, path, securityDescriptor, reparsePoint) {
+) : MemoryObj(memFS, parent, path, securityDescriptor, reparsePoint) {
     init {
         fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_DIRECTORY)
     }
