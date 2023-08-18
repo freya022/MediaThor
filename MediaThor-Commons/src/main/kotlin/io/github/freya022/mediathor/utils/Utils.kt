@@ -6,6 +6,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import mu.two.KotlinLogging
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ThreadFactory
 import kotlin.coroutines.CoroutineContext
 
@@ -43,5 +44,5 @@ fun countingThreadFactory(block: Thread.(threadNumber: Int) -> Unit) = object : 
     }
 }
 
-fun newExecutor(corePoolSize: Int, block: Thread.(threadNumber: Int) -> Unit) =
+fun newExecutor(corePoolSize: Int, block: Thread.(threadNumber: Int) -> Unit): ScheduledExecutorService =
     Executors.newScheduledThreadPool(corePoolSize, countingThreadFactory(block))
