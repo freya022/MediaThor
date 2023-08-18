@@ -8,6 +8,8 @@ import com.github.jnrwinfspteam.jnrwinfsp.api.ReparsePoint
 import com.github.jnrwinfspteam.jnrwinfsp.api.WinSysTime
 import jnr.ffi.Pointer
 import java.nio.file.Path
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlin.math.min
 
 private const val ALLOCATION_UNIT = 512
@@ -19,6 +21,8 @@ class FileObj(
     securityDescriptor: ByteArray,
     reparsePoint: ReparsePoint?
 ) : MemoryObj(parent, path, securityDescriptor, reparsePoint) {
+    private val lock = ReentrantLock()
+
     private var data = ByteArray(0)
     private var dataSize = 0
 
@@ -35,6 +39,7 @@ class FileObj(
 
     @Synchronized
     fun setFileSize(fileSize: Int) {
+    fun setFileSize(fileSize: Int): Unit = lock.withLock {
         val prevFileSize = this.fileSize
         if (fileSize < prevFileSize) {
             for (i in fileSize..<prevFileSize) {
@@ -47,13 +52,13 @@ class FileObj(
     }
 
     @Synchronized
-    fun adaptAllocationSize(fileSize: Int) {
+    fun adaptAllocationSize(fileSize: Int): Unit = lock.withLock {
         val units = (Math.addExact(fileSize, ALLOCATION_UNIT) - 1) / ALLOCATION_UNIT
         setAllocationSize(units * ALLOCATION_UNIT)
     }
 
     @Synchronized
-    fun setAllocationSize(newAllocationSize: Int) {
+    fun setAllocationSize(newAllocationSize: Int): Unit = lock.withLock {
         if (newAllocationSize != allocationSize) {
             // truncate or extend the data buffer
             val newFileSize = min(this.fileSize, newAllocationSize)
@@ -70,7 +75,7 @@ class FileObj(
 
     @Synchronized
     @Throws(NTStatusException::class)
-    fun read(buffer: Pointer, offsetL: Long, size: Int): Int {
+    fun read(buffer: Pointer, offsetL: Long, size: Int): Int = lock.withLock {
         val offset = Math.toIntExact(offsetL)
         if (offset >= this.fileSize)
             throw NTStatusException(-0x3fffffef) // STATUS_END_OF_FILE
@@ -84,7 +89,7 @@ class FileObj(
     }
 
     @Synchronized
-    fun write(buffer: Pointer, offsetL: Long, size: Int, writeToEndOfFile: Boolean): Int {
+    fun write(buffer: Pointer, offsetL: Long, size: Int, writeToEndOfFile: Boolean): Int = lock.withLock {
         var begOffset = Math.toIntExact(offsetL)
         if (writeToEndOfFile)
             begOffset = this.fileSize
@@ -101,7 +106,7 @@ class FileObj(
     }
 
     @Synchronized
-    fun constrainedWrite(buffer: Pointer, offsetL: Long, size: Int): Int {
+    fun constrainedWrite(buffer: Pointer, offsetL: Long, size: Int): Int = lock.withLock {
         val begOffset = Math.toIntExact(offsetL)
         if (begOffset >= this.fileSize)
             return 0
@@ -116,11 +121,11 @@ class FileObj(
         return transferredLength
     }
 
-    private fun setReadTime() {
+    private fun setReadTime(): Unit = lock.withLock {
         lastAccessTime = WinSysTime.now()
     }
 
-    private fun setWriteTime() {
+    private fun setWriteTime(): Unit = lock.withLock {
         lastWriteTime = WinSysTime.now()
     }
 }
