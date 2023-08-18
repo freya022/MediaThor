@@ -545,7 +545,7 @@ class WinFspMemFS(
     private fun generateVolumeInfo(): VolumeInfo {
         return VolumeInfo(
             totalSize,
-            totalSize - objects.values.sumOf { it.fileSize },
+            totalSize - objects.values.sumOf { it.allocationSize },
             volumeLabel
         )
     }
