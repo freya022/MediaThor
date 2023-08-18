@@ -27,9 +27,13 @@ class WinFspMemFS(
     val totalSize: Long
 ) : WinFspStubFS() {
     private val lock = ReentrantLock()
+
     private val objects: MutableMap<String, MemoryObj> = hashMapOf()
+    private val listeners: MutableList<MemFSListener> = arrayListOf()
 
     private var nextIndexNumber: Long = 1L
+
+    val mountPointPath: Path get() = Path.of(mountPoint)
 
     init {
         objects[ROOT_PATH.toString()] = DirObj(
@@ -39,6 +43,10 @@ class WinFspMemFS(
             SecurityDescriptorHandler.securityDescriptorToBytes(ROOT_SECURITY_DESCRIPTOR),
             null
         )
+    }
+
+    fun addListener(listener: MemFSListener) {
+        listeners += listener
     }
 
     override fun getVolumeInfo(): VolumeInfo = lock.withLock {
@@ -116,10 +124,17 @@ class WinFspMemFS(
         obj.indexNumber = nextIndexNumber++
         putObject(obj)
 
+        if (obj is FileObj) {
+            createdFileOpenCountMap[fileName] = 1
+        }
+
         val info = obj.generateFileInfo()
 
         return logger.exit(info)
     }
+
+    // Map that counts the number of opened handles to a newly-created file
+    private val createdFileOpenCountMap: MutableMap<String, Int> = hashMapOf()
 
     @Throws(NTStatusException::class)
     override fun open(
@@ -131,6 +146,9 @@ class WinFspMemFS(
 
         val filePath = getPath(fileName)
         val obj = getObject(filePath)
+
+        // Only increment file opens that come from newly-created files
+        createdFileOpenCountMap.computeIfPresent(fileName) { _, oldValue -> oldValue + 1 }
 
         return logger.exit(obj.generateFileInfo())
     }
@@ -202,6 +220,16 @@ class WinFspMemFS(
 
     override fun close(ctx: OpenContext): Unit = lock.withLock {
         logger.trace { "== CLOSE == $ctx" }
+
+        val count: Int? = createdFileOpenCountMap.computeIfPresent(ctx.path) { _, oldValue -> oldValue - 1 }
+        if (count == 0) {
+            createdFileOpenCountMap.remove(ctx.path)
+
+            logger.debug { "Definitely closed new file $ctx" }
+            val memoryObj = objects[ctx.path] as? FileObj
+                ?: return logger.warn { "No file object at $ctx, available: ${objects.keys}" }
+            listeners.forEach { it.onNewFileClosed(memoryObj) }
+        }
 
         //TODO maybe add space reclamation
     }
