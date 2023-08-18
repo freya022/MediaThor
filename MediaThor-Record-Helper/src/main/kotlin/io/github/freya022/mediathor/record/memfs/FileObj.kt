@@ -37,8 +37,10 @@ class FileObj(
         fileAttributes += FileAttributes.FILE_ATTRIBUTE_ARCHIVE
     }
 
-    @Synchronized
-    fun setFileSize(fileSize: Int) {
+    fun toArray(): ByteArray = lock.withLock {
+        data.copyOf(fileSize)
+    }
+
     fun setFileSize(fileSize: Int): Unit = lock.withLock {
         val prevFileSize = this.fileSize
         if (fileSize < prevFileSize) {
