@@ -31,6 +31,22 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         memFS.addListener(this)
     }
 
+    override fun onNewFileClosed(fileObj: FileObj) {
+        try {
+            val newFile = fileObj.absolutePath
+            if (newFile.extension != "mkv" || newFile.parent != memFS.mountPointPath)
+                return
+
+            scope.launch(Dispatchers.IO) {
+                mutex.withLock {
+                    onNewVideo(fileObj, newFile)
+                }
+            }
+        } catch (e: Exception) {
+            logger.catching(e)
+        }
+    }
+
     /**
      * How to concat N videos sharing common content:
      *  1. Extract all keyframes
@@ -55,22 +71,6 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
      *               as the audio tracks are simply missing, despite other MKV files working.
      *               VLC works fine though.
      */
-    override fun onNewFileClosed(fileObj: FileObj) {
-        try {
-            val newFile = fileObj.absolutePath
-            if (newFile.extension != "mkv" || newFile.parent != memFS.mountPointPath)
-                return
-
-            scope.launch(Dispatchers.IO) {
-                mutex.withLock {
-                    onNewVideo(fileObj, newFile)
-                }
-            }
-        } catch (e: Exception) {
-            logger.catching(e)
-        }
-    }
-
     private suspend fun onNewVideo(fileObj: FileObj, newFile: Path) {
         val keyframesFolder = extractKeyframes(newFile)
 
