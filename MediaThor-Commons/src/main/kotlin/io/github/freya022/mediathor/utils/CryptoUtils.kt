@@ -1,5 +1,6 @@
 package io.github.freya022.mediathor.utils
 
+import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.*
@@ -12,6 +13,19 @@ object CryptoUtils {
 
     fun hash(content: ByteArray): String {
         return toHexString(SHA3_256.digest(content))
+    }
+
+    fun hash(input: InputStream, bufferSize: Int): String = lock.withLock {
+        val buffer = ByteArray(bufferSize)
+        while (true) {
+            val actuallyRead = input.readNBytes(buffer, 0, buffer.size)
+            SHA3_256.update(buffer, 0, actuallyRead)
+
+            if (actuallyRead != buffer.size)
+                break
+        }
+
+        toHexString(SHA3_256.digest())
     }
 
     fun toHexString(bytes: ByteArray): String {
