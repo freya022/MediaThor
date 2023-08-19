@@ -7,6 +7,7 @@ import io.github.freya022.mediathor.utils.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import mu.two.KotlinLogging
 import java.io.ByteArrayOutputStream
 import java.nio.file.Path
@@ -51,7 +52,6 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
      *               as the audio tracks are simply missing, despite other MKV files working.
      *               VLC works fine though.
      */
-    @OptIn(ExperimentalPathApi::class)
     override fun onNewFileClosed(fileObj: FileObj): Unit = scope.launch(Dispatchers.IO) {
         //TODO mutex
         try {
@@ -59,60 +59,84 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
 
             if (newFile.extension != "mkv" || newFile.parent != memFS.mountPointPath) return@launch
 
-            logger.debug { "Extracting keyframes from $newFile" }
+            val keyframesFolder = extractKeyframes(newFile)
 
-            val keyframesFolder = memFS.mountPointPath.resolve("${newFile.nameWithoutExtension} - Keyframes").createDirectory()
+            val keyframeIndexByHash = hashKeyframes(newFile, keyframesFolder)
 
-            val outputStream = ByteArrayOutputStream()
-            val errorStream = ByteArrayOutputStream()
-            ProcessBuilder()
-                .directory(memFS.mountPointPath)
-                .command("ffmpeg", "-skip_frame", "nokey", "-i", newFile.absolutePathString(), "-vsync", "0", "-f", "image2", "${keyframesFolder.absolutePathString()}/keyframe-0%3d.png")
-                .start()
-                .redirectOutputs(outputStream, errorStream)
-                .waitFor(logger, outputStream, errorStream)
-
-            logger.info { "Extracted keyframes of $newFile" }
-
-            logger.debug { "Hashing keyframes from $newFile" }
-            //TODO optimize using direct FileObj access
-            val keyframeIndexByHash = keyframesFolder
-                .walk()
-                .filter { it != keyframesFolder }
-                .associate { path ->
-                    val keyframeNumber = path.nameWithoutExtension.substringAfterLast('-').toInt()
-                    val hash = path.inputStream().use { CryptoUtils.hash(it, 1024 * 1024) }
-                    hash to keyframeNumber
-                }
             val currentClip = Clip(newFile, keyframeIndexByHash)
             clips += currentClip
-            logger.info { "Hashed keyframes of $newFile" }
 
-            //TODO use functions
-
-            // Try to find a video with matching keyframe
-            // If the previous video doesn't have any matching keyframe,
-            // then flush previous videos, optionally combining them if there is more than 2
-            if (clips.size > 1) {
-                // Find matching keyframe with previous video
-                val previousClip = clips[clips.size - 2]
-
-                logger.debug { "Trying to match keyframes between ${currentClip.path} and ${previousClip.path}" }
-
-                // Simply check if two frames match, no info is required
-                val currentHashes = currentClip.keyframeIndexByHash.keys
-                val previousHashes = previousClip.keyframeIndexByHash.keys
-                val hasMatchingHash = currentHashes.any { currentKeyframeHash -> currentKeyframeHash in previousHashes }
-
-                if (!hasMatchingHash) {
-                    logger.info { "Found no matched keyframe between ${currentClip.path} and ${previousClip.path}, flushing previous videos to disk" }
-                    //TODO flush previous videos
-                } else {
-                    logger.info { "Matched keyframe between ${currentClip.path} and ${previousClip.path}, keeping videos" }
-                }
-            }
+            checkMatchingKeyframe(currentClip)
         } catch (e: Exception) {
             logger.catching(e)
         }
     }.let { }
+
+    private suspend fun extractKeyframes(newFile: Path): Path = withContext(Dispatchers.IO) {
+        logger.debug { "Extracting keyframes from $newFile" }
+
+        val keyframesFolder = memFS.mountPointPath
+            .resolve("${newFile.nameWithoutExtension} - Keyframes")
+            .createDirectory()
+
+        val outputStream = ByteArrayOutputStream()
+        val errorStream = ByteArrayOutputStream()
+        ProcessBuilder()
+            .directory(memFS.mountPointPath)
+            .command(
+                "ffmpeg",
+                "-skip_frame", "nokey",
+                "-i", newFile.absolutePathString(),
+                "-vsync", "0",
+                "-f", "image2",
+                "${keyframesFolder.absolutePathString()}/keyframe-0%3d.png")
+            .start()
+            .redirectOutputs(outputStream, errorStream)
+            .waitFor(logger, outputStream, errorStream)
+
+        logger.info { "Extracted keyframes of $newFile" }
+        keyframesFolder
+    }
+
+    @OptIn(ExperimentalPathApi::class)
+    private fun hashKeyframes(newFile: Path, keyframesFolder: Path): Map<String, Int> {
+        logger.debug { "Hashing keyframes from $newFile" }
+
+        //TODO optimize using direct FileObj access
+        val keyframeIndexByHash = keyframesFolder
+            .walk()
+            .filter { it != keyframesFolder }
+            .associate { path ->
+                val keyframeNumber = path.nameWithoutExtension.substringAfterLast('-').toInt()
+                val hash = path.inputStream().use { CryptoUtils.hash(it, 1024 * 1024) }
+                hash to keyframeNumber
+            }
+
+        logger.info { "Hashed keyframes of $newFile" }
+        return keyframeIndexByHash
+    }
+
+    private fun checkMatchingKeyframe(currentClip: Clip) {
+        // Try to find a video with matching keyframe
+        // If the previous video doesn't have any matching keyframe,
+        // then flush previous videos, optionally combining them if there is more than 2
+        if (clips.size > 1) {
+            // Find matching keyframe with previous video
+            val previousClip = clips[clips.size - 2]
+
+            logger.debug { "Trying to match keyframes between ${currentClip.path} and ${previousClip.path}" }
+
+            // Simply check if two frames match, no info is required
+            val currentHashes = currentClip.keyframeIndexByHash.keys
+            val previousHashes = previousClip.keyframeIndexByHash.keys
+            val hasMatchingHash = currentHashes.any { currentKeyframeHash -> currentKeyframeHash in previousHashes }
+
+            if (!hasMatchingHash) {
+                logger.info { "Found no matched keyframe between ${currentClip.path} and ${previousClip.path}, flushing previous videos to disk" }
+                //TODO flush previous videos
+            } else {
+                logger.info { "Matched keyframe between ${currentClip.path} and ${previousClip.path}, keeping videos" }
+            }
+        }
+    }
 }
