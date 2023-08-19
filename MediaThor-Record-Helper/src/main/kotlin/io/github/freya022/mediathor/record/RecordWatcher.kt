@@ -7,12 +7,11 @@ import io.github.freya022.mediathor.utils.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import mu.two.KotlinLogging
 import java.io.ByteArrayOutputStream
 import java.nio.file.Path
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.io.path.*
 
 private typealias KeyframeIndex = Int
@@ -24,7 +23,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
     private class Clip(val path: Path, val keyframeIndexByHash: Map<KeyframeHash, KeyframeIndex>)
 
     private val scope = getDefaultScope(newExecutor(1) { threadNumber -> name = "MediaThor record watch thread #$threadNumber" }.asCoroutineDispatcher())
-    private val mutex = Mutex()
+    private val lock = ReentrantLock()
     private val clips: MutableList<Clip> = arrayListOf()
 
     init {
@@ -37,9 +36,12 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
             if (newFile.extension != "mkv" || newFile.parent != memFS.mountPointPath)
                 return
 
+            lock.lock()
             scope.launch(Dispatchers.IO) {
-                mutex.withLock {
+                try {
                     onNewVideo(fileObj, newFile)
+                } finally {
+                    lock.unlock()
                 }
             }
         } catch (e: Exception) {
