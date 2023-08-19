@@ -94,17 +94,19 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         val previousVideos = clips.dropLast(1)
         clips.clear()
 
-        val mergePath = Data.videosFolder.resolve(previousVideos.last().path.name)
+        val copyPath = Data.videosFolder.resolve(previousVideos.last().path.name)
 
         // If there is only one previous clip, copy to disk
         if (previousVideos.size == 1) {
-            previousVideos.single().path.moveTo(mergePath)
-            logger.info { "Moved ${previousVideos.single().path} into $mergePath" }
+            previousVideos.single().path.moveTo(copyPath)
+            logger.info { "Moved ${previousVideos.single().path} into $copyPath" }
             return@withContext
         }
 
         // Merge previous videos to disk
         logger.debug { "Merging ${previousVideos.joinToString { it.path.name }}" }
+
+        val mergePath = copyPath.resolveSibling(copyPath.nameWithoutExtension + ".mp4")
 
         val inputs = previousVideos.map {
             val timestamps = getKeyframeTimestamps(it.path)
