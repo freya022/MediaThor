@@ -7,6 +7,8 @@ import io.github.freya022.mediathor.utils.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import mu.two.KotlinLogging
 import java.io.ByteArrayOutputStream
@@ -22,6 +24,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
     private class Clip(val path: Path, val keyframeIndexByHash: Map<KeyframeHash, KeyframeIndex>)
 
     private val scope = getDefaultScope(newExecutor(1) { threadNumber -> name = "MediaThor record watch thread #$threadNumber" }.asCoroutineDispatcher())
+    private val mutex = Mutex()
     private val clips: MutableList<Clip> = arrayListOf()
 
     init {
@@ -52,25 +55,32 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
      *               as the audio tracks are simply missing, despite other MKV files working.
      *               VLC works fine though.
      */
-    override fun onNewFileClosed(fileObj: FileObj): Unit = scope.launch(Dispatchers.IO) {
-        //TODO mutex
+    override fun onNewFileClosed(fileObj: FileObj) {
         try {
             val newFile = fileObj.absolutePath
+            if (newFile.extension != "mkv" || newFile.parent != memFS.mountPointPath)
+                return
 
-            if (newFile.extension != "mkv" || newFile.parent != memFS.mountPointPath) return@launch
-
-            val keyframesFolder = extractKeyframes(newFile)
-
-            val keyframeIndexByHash = hashKeyframes(newFile, keyframesFolder)
-
-            val currentClip = Clip(newFile, keyframeIndexByHash)
-            clips += currentClip
-
-            checkMatchingKeyframe(currentClip)
+            scope.launch(Dispatchers.IO) {
+                mutex.withLock {
+                    onNewVideo(fileObj, newFile)
+                }
+            }
         } catch (e: Exception) {
             logger.catching(e)
         }
-    }.let { }
+    }
+
+    private suspend fun onNewVideo(fileObj: FileObj, newFile: Path) {
+        val keyframesFolder = extractKeyframes(newFile)
+
+        val keyframeIndexByHash = hashKeyframes(newFile, keyframesFolder)
+
+        val currentClip = Clip(newFile, keyframeIndexByHash)
+        clips += currentClip
+
+        checkMatchingKeyframe(currentClip)
+    }
 
     private suspend fun extractKeyframes(newFile: Path): Path = withContext(Dispatchers.IO) {
         logger.debug { "Extracting keyframes from $newFile" }
