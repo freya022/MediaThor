@@ -79,7 +79,9 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         val currentClip = Clip(newFile, keyframeIndexByHash)
         clips += currentClip
 
-        checkMatchingKeyframe(currentClip)
+        checkMismatchedKeyframe(currentClip) {
+            // Merge previous videos to disk
+        }
     }
 
     private suspend fun extractKeyframes(newFile: Path): Path = withContext(Dispatchers.IO) {
@@ -126,7 +128,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         return keyframeIndexByHash
     }
 
-    private fun checkMatchingKeyframe(currentClip: Clip) {
+    private suspend fun checkMismatchedKeyframe(currentClip: Clip, onMismatch: suspend () -> Unit) {
         // Try to find a video with matching keyframe
         // If the previous video doesn't have any matching keyframe,
         // then flush previous videos, optionally combining them if there is more than 2
@@ -141,11 +143,11 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
             val previousHashes = previousClip.keyframeIndexByHash.keys
             val hasMatchingHash = currentHashes.any { currentKeyframeHash -> currentKeyframeHash in previousHashes }
 
-            if (!hasMatchingHash) {
-                logger.info { "Found no matched keyframe between ${currentClip.path} and ${previousClip.path}, flushing previous videos to disk" }
-                //TODO flush previous videos
-            } else {
+            if (hasMatchingHash) {
                 logger.info { "Matched keyframe between ${currentClip.path} and ${previousClip.path}, keeping videos" }
+            } else {
+                logger.info { "Found no matched keyframe between ${currentClip.path} and ${previousClip.path}, flushing previous videos to disk" }
+                onMismatch()
             }
         }
     }
