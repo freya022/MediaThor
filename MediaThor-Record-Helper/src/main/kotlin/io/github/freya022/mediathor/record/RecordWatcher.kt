@@ -185,6 +185,14 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
                 *inputArgs.toTypedArray(),
                 "-filter_complex", filter,
                 *mappings.toTypedArray(),
+                "-c:v", "h264_nvenc",
+                "-rc", "constqp",
+                "-qmin", "0",
+                "-cq", "32",
+                "-preset", "p6",
+                "-multipass", "0",
+                "-profile:v", "high",
+                "-tune", "hq",
                 mergePath.absolutePathString()
             )
             .start()
