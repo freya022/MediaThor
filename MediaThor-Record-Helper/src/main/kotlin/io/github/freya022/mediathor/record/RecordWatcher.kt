@@ -29,7 +29,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         var endTimestamp: String? = null
     }
 
-    private val scope = getDefaultScope(newExecutor(1) { threadNumber -> name = "RecordWatcher thread #$threadNumber" }.asCoroutineDispatcher())
+    private val scope = getDefaultScope(newExecutor(1, daemon = true) { threadNumber -> name = "RecordWatcher thread #$threadNumber" }.asCoroutineDispatcher())
     private val clips: MutableList<Clip> = arrayListOf()
 
     private val newVideoSequencer = Sequencer(scope)
