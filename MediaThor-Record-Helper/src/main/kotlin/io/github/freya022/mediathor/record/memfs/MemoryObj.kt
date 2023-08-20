@@ -8,7 +8,7 @@ import java.util.*
 
 sealed class MemoryObj(
     val memFS: WinFspMemFS,
-    val parent: MemoryObj?,
+    var parent: MemoryObj?,
     var fsLocalPath: Path,
     var securityDescriptor: ByteArray,
     reparsePoint: ReparsePoint?

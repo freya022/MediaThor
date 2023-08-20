@@ -379,6 +379,7 @@ class WinFspMemFS(
                 val newObj = removeObject(obj.fsLocalPath)
 
                 newObj!!.fsLocalPath = newObjPath
+                newObj.parent = getDirObject(newObjPath.parent)
                 putObject(newObj)
             }
         }
@@ -439,7 +440,7 @@ class WinFspMemFS(
 
         val finalMarker = marker
         objects.values.asSequence()
-            .filter { obj -> obj.parent != null && obj.parent.fsLocalPath == dir.fsLocalPath }
+            .filter { obj -> obj.parent != null && obj.parent!!.fsLocalPath == dir.fsLocalPath }
             .sortedWith(Comparator.comparing(MemoryObj::name, NATURAL_ORDER))
             .dropWhile { obj -> isBeforeMarker(obj.name, finalMarker) }
             .map { obj -> obj.generateFileInfo(obj.name) }
