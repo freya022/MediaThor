@@ -50,6 +50,8 @@ class WinFspMemFS(
         listeners += listener
     }
 
+    fun getFreeSize(): Long = max(0, totalSize - objects.values.sumOf { it.allocationSize.toLong() })
+
     override fun getVolumeInfo(): VolumeInfo = lock.withLock {
         logger.trace("== GET VOLUME INFO ==")
 
@@ -109,7 +111,7 @@ class WinFspMemFS(
 
         if (objects.size >= MAX_FILE_NODES)
             throw NTStatusException(-0x3ffffd16) // STATUS_CANNOT_MAKE
-        if (allocationSize > maxFileSize)
+        if (getFreeSize() < allocationSize || allocationSize > maxFileSize)
             throw NTStatusException(-0x3fffff81) // STATUS_DISK_FULL
 
         val obj: MemoryObj = when {
@@ -576,7 +578,7 @@ class WinFspMemFS(
     private fun generateVolumeInfo(): VolumeInfo {
         return VolumeInfo(
             totalSize,
-            max(0, totalSize - objects.values.sumOf { it.allocationSize }),
+            getFreeSize(),
             volumeLabel
         )
     }

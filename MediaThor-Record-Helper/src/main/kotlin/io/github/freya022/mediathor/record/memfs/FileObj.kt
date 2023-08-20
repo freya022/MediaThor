@@ -65,7 +65,8 @@ class FileObj(
             // truncate or extend the data buffer
             val newFileSize = min(this.fileSize, newAllocationSize)
             if (data.size < newAllocationSize) {
-                if (newAllocationSize > memFS.maxFileSize)
+                //free + previous_size - new_size <= 0
+                if (memFS.getFreeSize() + allocationSize - newAllocationSize <= 0 || newAllocationSize > memFS.maxFileSize)
                     throw NTStatusException(-0x3fffff81) // STATUS_DISK_FULL
 
                 data = data.copyOf(min(newAllocationSize * 2, memFS.maxFileSize))
