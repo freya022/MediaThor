@@ -10,6 +10,7 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.math.BigDecimal
 import java.nio.file.Path
+import kotlin.concurrent.thread
 import kotlin.io.path.*
 
 private typealias ClipPath = Path
@@ -35,6 +36,30 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
 
     init {
         memFS.addListener(this)
+
+        thread(name = "RecordWatcher Command thread", isDaemon = true) {
+            while (true) {
+                try {
+                    val input = readlnOrNull() ?: break
+
+                    if (input.contentEquals("flush", ignoreCase = true)) {
+                        scope.launch {
+                            newVideoSequencer.runTask {
+                                val previousVideos = clips.toList()
+                                clips.clear()
+
+                                flushVideos(previousVideos)
+                            }
+                        }
+                    } else {
+                        System.err.println("Unknown command '$input'")
+                    }
+                } catch (e: Exception) {
+                    logger.catching(e)
+                }
+            }
+            logger.debug { "Exited Command thread" }
+        }
     }
 
     override fun onNewFileClosed(fileObj: FileObj) {
@@ -89,16 +114,22 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
     }
 
     context(CoroutineScope)
-    @OptIn(ExperimentalPathApi::class)
     private suspend fun onMismatchedKeyframe() = withContext(Dispatchers.IO) {
         val previousVideos = clips.dropLast(1)
         clips.removeIf { it != clips.last() }
 
+        flushVideos(previousVideos)
+    }
+
+    context(CoroutineScope)
+    @OptIn(ExperimentalPathApi::class)
+    private suspend fun flushVideos(previousVideos: List<Clip>) {
         val copyPath = Data.videosFolder.resolve(previousVideos.last().path.name)
 
         // If there is only one previous clip, copy to disk
         if (previousVideos.size == 1) {
             val previousVideoPath = previousVideos.single().path
+            logger.debug { "Moving $previousVideoPath into $copyPath" }
 
             // Copy
             previousVideoPath.moveTo(copyPath)
@@ -106,7 +137,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
             getKeyframeFolder(previousVideoPath).deleteRecursively()
 
             logger.info { "Moved $previousVideoPath into $copyPath" }
-            return@withContext
+            return
         }
 
         // Merge previous videos to disk
