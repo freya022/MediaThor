@@ -11,6 +11,7 @@ import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 import java.util.function.Predicate
 import kotlin.concurrent.withLock
+import kotlin.math.max
 
 private const val ROOT_SECURITY_DESCRIPTOR = "O:BAG:BAD:PAR(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;WD)"
 private val NATURAL_ORDER: Comparator<String> = NaturalOrderComparator()
@@ -575,7 +576,7 @@ class WinFspMemFS(
     private fun generateVolumeInfo(): VolumeInfo {
         return VolumeInfo(
             totalSize,
-            totalSize - objects.values.sumOf { it.allocationSize },
+            max(0, totalSize - objects.values.sumOf { it.allocationSize }),
             volumeLabel
         )
     }
