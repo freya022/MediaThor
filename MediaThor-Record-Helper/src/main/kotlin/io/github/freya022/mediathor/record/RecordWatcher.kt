@@ -92,7 +92,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
     @OptIn(ExperimentalPathApi::class)
     private suspend fun onMismatchedKeyframe() = withContext(Dispatchers.IO) {
         val previousVideos = clips.dropLast(1)
-        clips.clear()
+        clips.removeIf { it != clips.last() }
 
         val copyPath = Data.videosFolder.resolve(previousVideos.last().path.name)
 
