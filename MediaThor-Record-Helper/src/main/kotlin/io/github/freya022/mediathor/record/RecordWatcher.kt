@@ -113,7 +113,6 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         checkMismatchedKeyframe(currentClip) { onMismatchedKeyframe() }
     }
 
-    context(CoroutineScope)
     private suspend fun onMismatchedKeyframe() = withContext(Dispatchers.IO) {
         val previousVideos = clips.dropLast(1)
         clips.removeIf { it != clips.last() }
@@ -121,9 +120,8 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         flushVideos(previousVideos)
     }
 
-    context(CoroutineScope)
     @OptIn(ExperimentalPathApi::class)
-    private suspend fun flushVideos(previousVideos: List<Clip>) {
+    private suspend fun flushVideos(previousVideos: List<Clip>) = withContext(Dispatchers.IO) {
         val copyPath = Data.videosFolder.resolve(previousVideos.last().path.name)
 
         // If there is only one previous clip, copy to disk
@@ -137,7 +135,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
             getKeyframeFolder(previousVideoPath).deleteRecursively()
 
             logger.info { "Moved $previousVideoPath into $copyPath" }
-            return
+            return@withContext
         }
 
         // Merge previous videos to disk
@@ -248,7 +246,6 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         logger.info { "Deleted source files: ${previousVideos.joinToString { it.path.absolutePathString() }}" }
     }
 
-    context(CoroutineScope)
     private suspend fun getKeyframeTimestamps(path: ClipPath): List<KeyframeTimestamp> = withContext(Dispatchers.IO) {
         val outputStream = ByteArrayOutputStream()
         val errorStream = ByteArrayOutputStream()
@@ -271,7 +268,6 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         outputStream.toByteArray().decodeToString().trim().lines()
     }
 
-    context(CoroutineScope)
     private suspend fun getClipAudioStreams(path: ClipPath): Int = withContext(Dispatchers.IO) {
         val outputStream = ByteArrayOutputStream()
         val errorStream = ByteArrayOutputStream()
