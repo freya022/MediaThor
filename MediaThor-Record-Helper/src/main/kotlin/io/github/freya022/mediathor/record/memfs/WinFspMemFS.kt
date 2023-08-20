@@ -234,7 +234,7 @@ class WinFspMemFS(
             listeners.forEach { it.onNewFileClosed(memoryObj) }
         }
 
-        //TODO maybe add space reclamation
+        (objects[ctx.path] as? FileObj)?.compact()
     }
 
     @Throws(NTStatusException::class)

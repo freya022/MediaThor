@@ -119,6 +119,13 @@ class FileObj(
         return transferredLength
     }
 
+    fun compact(): Unit = lock.withLock {
+        if (fileSize != dataSize) {
+            data = data.copyOf(fileSize)
+            dataSize = fileSize
+        }
+    }
+
     private fun setReadTime(): Unit = lock.withLock {
         lastAccessTime = WinSysTime.now()
     }
