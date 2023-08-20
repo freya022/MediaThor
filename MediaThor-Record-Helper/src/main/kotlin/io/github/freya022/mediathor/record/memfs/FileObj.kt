@@ -53,13 +53,11 @@ class FileObj(
         this.fileSize = fileSize
     }
 
-    @Synchronized
     fun adaptAllocationSize(fileSize: Int): Unit = lock.withLock {
         val units = (Math.addExact(fileSize, ALLOCATION_UNIT) - 1) / ALLOCATION_UNIT
         setAllocationSize(units * ALLOCATION_UNIT)
     }
 
-    @Synchronized
     fun setAllocationSize(newAllocationSize: Int): Unit = lock.withLock {
         if (newAllocationSize != allocationSize) {
             // truncate or extend the data buffer
@@ -76,7 +74,6 @@ class FileObj(
         }
     }
 
-    @Synchronized
     @Throws(NTStatusException::class)
     fun read(buffer: Pointer, offsetL: Long, size: Int): Int = lock.withLock {
         val offset = Math.toIntExact(offsetL)
@@ -91,7 +88,6 @@ class FileObj(
         return bytesToRead
     }
 
-    @Synchronized
     fun write(buffer: Pointer, offsetL: Long, size: Int, writeToEndOfFile: Boolean): Int = lock.withLock {
         var begOffset = Math.toIntExact(offsetL)
         if (writeToEndOfFile)
@@ -108,7 +104,6 @@ class FileObj(
         return size
     }
 
-    @Synchronized
     fun constrainedWrite(buffer: Pointer, offsetL: Long, size: Int): Int = lock.withLock {
         val begOffset = Math.toIntExact(offsetL)
         if (begOffset >= this.fileSize)
