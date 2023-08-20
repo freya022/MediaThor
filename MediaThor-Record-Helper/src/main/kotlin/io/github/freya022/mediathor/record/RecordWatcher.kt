@@ -98,8 +98,14 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
 
         // If there is only one previous clip, copy to disk
         if (previousVideos.size == 1) {
-            previousVideos.single().path.moveTo(copyPath)
-            logger.info { "Moved ${previousVideos.single().path} into $copyPath" }
+            val previousVideoPath = previousVideos.single().path
+
+            // Copy
+            previousVideoPath.moveTo(copyPath)
+            // Delete keyframes
+            getKeyframeFolder(previousVideoPath).deleteRecursively()
+
+            logger.info { "Moved $previousVideoPath into $copyPath" }
             return@withContext
         }
 
