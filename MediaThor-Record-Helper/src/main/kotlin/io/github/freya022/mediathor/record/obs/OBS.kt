@@ -136,8 +136,12 @@ class OBS(private val host: String, private val port: Int, private val password:
                         continue
                     }
 
-                    val opCode = gson.fromJson(text, continuation.typeToken)
-                    continuation.continuation.resume(opCode.d.responseData ?: NullRequestResponse)
+                    val (_, _, status, data) = gson.fromJson(text, continuation.typeToken).d
+                    if (!status.result) {
+                        val (_, code, comment) = status
+                        continuation.continuation.resumeWithException(OBSException(code, comment))
+                    }
+                    continuation.continuation.resume(data ?: NullRequestResponse)
                 }
             } catch (e: ClosedReceiveChannelException) {
                 val closeReason = closeReason.await()
