@@ -1,10 +1,10 @@
 package io.github.freya022.mediathor.record.obs.data.requests
 
 import io.github.freya022.mediathor.record.obs.data.OpCodeData
-import io.github.freya022.mediathor.record.obs.data.receiveGateway
-import io.ktor.client.plugins.websocket.*
 
 interface RequestResponseData
+
+data object NullRequestResponse : RequestResponseData
 
 data class RequestResponse<T : RequestResponseData>(
     val requestType: String,
@@ -14,6 +14,3 @@ data class RequestResponse<T : RequestResponseData>(
 ) : OpCodeData {
     data class Status(val result: Boolean, val code: Int, val comment: String?)
 }
-
-suspend inline fun <reified T : RequestResponseData> DefaultClientWebSocketSession.receiveRequestResponse(): RequestResponse<T> =
-    receiveGateway<RequestResponse<T>>()

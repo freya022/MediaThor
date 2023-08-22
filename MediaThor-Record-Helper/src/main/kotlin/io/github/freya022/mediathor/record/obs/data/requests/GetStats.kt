@@ -7,8 +7,6 @@ class GetStats : Request<GetStats.Data>() {
     override val requestData: Data = Data
 }
 
-fun getStats() = GetStats().toOpCode()
-
 data class GetStatsData(
     val cpuUsage: Double,
     val memoryUsage: Double,
