@@ -21,7 +21,6 @@ import kotlinx.coroutines.sync.Semaphore
 import mu.two.KotlinLogging
 import okhttp3.OkHttpClient
 import java.io.ByteArrayOutputStream
-import java.io.InputStream
 import java.net.URI
 import java.nio.file.Path
 import kotlin.io.path.*
@@ -85,17 +84,6 @@ class MediaThorDownloader private constructor(private val outputPath: Path, priv
                 .waitFor(logger, outputStream, errorStream)
 
             concatListPath.deleteExisting()
-        }
-    }
-
-    private fun redirectStream(arrayStream: ByteArrayOutputStream, processStream: InputStream) {
-        arrayStream.bufferedWriter().use { writer ->
-            processStream.bufferedReader().use { reader ->
-                var readLine: String?
-                while (reader.readLine().also { readLine = it } != null) {
-                    writer.append(readLine + System.lineSeparator())
-                }
-            }
         }
     }
 

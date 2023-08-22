@@ -34,15 +34,16 @@ fun getDefaultScope(
     return CoroutineScope(context + parent + handler)
 }
 
-fun countingThreadFactory(block: Thread.(threadNumber: Int) -> Unit) = object : ThreadFactory {
+fun countingThreadFactory(daemon: Boolean = false, block: Thread.(threadNumber: Int) -> Unit) = object : ThreadFactory {
     private var threadNumber = 0
 
     override fun newThread(r: Runnable): Thread {
         val thread = Thread(r)
+        thread.isDaemon = daemon
         block(thread, threadNumber++)
         return thread
     }
 }
 
-fun newExecutor(corePoolSize: Int, block: Thread.(threadNumber: Int) -> Unit): ScheduledExecutorService =
-    Executors.newScheduledThreadPool(corePoolSize, countingThreadFactory(block))
+fun newExecutor(corePoolSize: Int, daemon: Boolean = false, block: Thread.(threadNumber: Int) -> Unit): ScheduledExecutorService =
+    Executors.newScheduledThreadPool(corePoolSize, countingThreadFactory(daemon, block))

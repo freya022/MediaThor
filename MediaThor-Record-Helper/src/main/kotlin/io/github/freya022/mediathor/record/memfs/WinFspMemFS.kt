@@ -11,6 +11,7 @@ import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 import java.util.function.Predicate
 import kotlin.concurrent.withLock
+import kotlin.math.max
 
 private const val ROOT_SECURITY_DESCRIPTOR = "O:BAG:BAD:PAR(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;WD)"
 private val NATURAL_ORDER: Comparator<String> = NaturalOrderComparator()
@@ -33,7 +34,7 @@ class WinFspMemFS(
 
     private var nextIndexNumber: Long = 1L
 
-    val mountPointPath: Path get() = Path.of(mountPoint)
+    val mountPointPath: Path get() = Path.of(mountPoint).toAbsolutePath()
 
     init {
         objects[ROOT_PATH.toString()] = DirObj(
@@ -48,6 +49,8 @@ class WinFspMemFS(
     fun addListener(listener: MemFSListener) {
         listeners += listener
     }
+
+    fun getFreeSize(): Long = max(0, totalSize - objects.values.sumOf { it.allocationSize.toLong() })
 
     override fun getVolumeInfo(): VolumeInfo = lock.withLock {
         logger.trace("== GET VOLUME INFO ==")
@@ -108,7 +111,7 @@ class WinFspMemFS(
 
         if (objects.size >= MAX_FILE_NODES)
             throw NTStatusException(-0x3ffffd16) // STATUS_CANNOT_MAKE
-        if (allocationSize > maxFileSize)
+        if (getFreeSize() < allocationSize || allocationSize > maxFileSize)
             throw NTStatusException(-0x3fffff81) // STATUS_DISK_FULL
 
         val obj: MemoryObj = when {
@@ -231,7 +234,7 @@ class WinFspMemFS(
             listeners.forEach { it.onNewFileClosed(memoryObj) }
         }
 
-        //TODO maybe add space reclamation
+        (objects[ctx.path] as? FileObj)?.compact()
     }
 
     @Throws(NTStatusException::class)
@@ -379,6 +382,7 @@ class WinFspMemFS(
                 val newObj = removeObject(obj.fsLocalPath)
 
                 newObj!!.fsLocalPath = newObjPath
+                newObj.parent = getDirObject(newObjPath.parent)
                 putObject(newObj)
             }
         }
@@ -439,7 +443,7 @@ class WinFspMemFS(
 
         val finalMarker = marker
         objects.values.asSequence()
-            .filter { obj -> obj.parent != null && obj.parent.fsLocalPath == dir.fsLocalPath }
+            .filter { obj -> obj.parent != null && obj.parent!!.fsLocalPath == dir.fsLocalPath }
             .sortedWith(Comparator.comparing(MemoryObj::name, NATURAL_ORDER))
             .dropWhile { obj -> isBeforeMarker(obj.name, finalMarker) }
             .map { obj -> obj.generateFileInfo(obj.name) }
@@ -574,7 +578,7 @@ class WinFspMemFS(
     private fun generateVolumeInfo(): VolumeInfo {
         return VolumeInfo(
             totalSize,
-            totalSize - objects.values.sumOf { it.allocationSize },
+            getFreeSize(),
             volumeLabel
         )
     }

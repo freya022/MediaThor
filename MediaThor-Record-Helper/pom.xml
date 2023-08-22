@@ -12,6 +12,26 @@
     <artifactId>mediathor-record-helper</artifactId>
     <name>MediaThor-Record-Helper</name>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <configuration>
+                    <transformers>
+                        <transformer
+                                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                            <mainClass>io.github.freya022.mediathor.record.Main</mainClass>
+                        </transformer>
+                    </transformers>
+
+                    <createDependencyReducedPom>false</createDependencyReducedPom>
+                    <finalName>MediaThor-Record-Helper</finalName>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
     <dependencies>
         <dependency>
             <groupId>io.github.freya022</groupId>

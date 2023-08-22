@@ -53,19 +53,18 @@ class FileObj(
         this.fileSize = fileSize
     }
 
-    @Synchronized
     fun adaptAllocationSize(fileSize: Int): Unit = lock.withLock {
         val units = (Math.addExact(fileSize, ALLOCATION_UNIT) - 1) / ALLOCATION_UNIT
         setAllocationSize(units * ALLOCATION_UNIT)
     }
 
-    @Synchronized
     fun setAllocationSize(newAllocationSize: Int): Unit = lock.withLock {
         if (newAllocationSize != allocationSize) {
             // truncate or extend the data buffer
             val newFileSize = min(this.fileSize, newAllocationSize)
             if (data.size < newAllocationSize) {
-                if (newAllocationSize > memFS.maxFileSize)
+                //free + previous_size - new_size <= 0
+                if (memFS.getFreeSize() + allocationSize - newAllocationSize <= 0 || newAllocationSize > memFS.maxFileSize)
                     throw NTStatusException(-0x3fffff81) // STATUS_DISK_FULL
 
                 data = data.copyOf(min(newAllocationSize * 2, memFS.maxFileSize))
@@ -75,7 +74,6 @@ class FileObj(
         }
     }
 
-    @Synchronized
     @Throws(NTStatusException::class)
     fun read(buffer: Pointer, offsetL: Long, size: Int): Int = lock.withLock {
         val offset = Math.toIntExact(offsetL)
@@ -90,7 +88,6 @@ class FileObj(
         return bytesToRead
     }
 
-    @Synchronized
     fun write(buffer: Pointer, offsetL: Long, size: Int, writeToEndOfFile: Boolean): Int = lock.withLock {
         var begOffset = Math.toIntExact(offsetL)
         if (writeToEndOfFile)
@@ -107,7 +104,6 @@ class FileObj(
         return size
     }
 
-    @Synchronized
     fun constrainedWrite(buffer: Pointer, offsetL: Long, size: Int): Int = lock.withLock {
         val begOffset = Math.toIntExact(offsetL)
         if (begOffset >= this.fileSize)
@@ -121,6 +117,13 @@ class FileObj(
         setWriteTime()
 
         return transferredLength
+    }
+
+    fun compact(): Unit = lock.withLock {
+        if (fileSize != dataSize) {
+            data = data.copyOf(fileSize)
+            dataSize = fileSize
+        }
     }
 
     private fun setReadTime(): Unit = lock.withLock {
