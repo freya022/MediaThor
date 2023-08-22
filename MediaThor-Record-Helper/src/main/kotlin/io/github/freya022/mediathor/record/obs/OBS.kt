@@ -161,6 +161,10 @@ class OBS(private val host: String, private val port: Int, private val password:
 
     suspend fun getStats(): GetStatsData = GetStats().await()
 
+    suspend fun startReplayBuffer(): NullRequestResponse = StartReplayBuffer().await()
+    suspend fun stopReplayBuffer(): NullRequestResponse = StopReplayBuffer().await()
+    suspend fun saveReplayBuffer(): NullRequestResponse = SaveReplayBuffer().await()
+
     @Suppress("UNCHECKED_CAST")
     private suspend inline fun <reified R : RequestResponseData> Request<*>.await(): R = suspendCancellableCoroutine {
         it.invokeOnCancellation { requestContinuations.remove(this.requestId) }
