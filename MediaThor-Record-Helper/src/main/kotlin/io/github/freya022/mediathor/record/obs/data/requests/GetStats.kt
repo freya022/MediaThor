@@ -10,7 +10,7 @@ class GetStats : Request<GetStats.Data>() {
 data class GetStatsData(
     val cpuUsage: Double,
     val memoryUsage: Double,
-    val availableDiskSpace: Long,
+    val availableDiskSpace: Double,
     val activeFps: Double,
     val averageFrameRenderTime: Double,
     val renderSkippedFrames: Long,
