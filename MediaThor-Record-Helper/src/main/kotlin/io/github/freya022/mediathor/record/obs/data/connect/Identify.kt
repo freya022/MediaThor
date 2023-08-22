@@ -5,4 +5,4 @@ import io.github.freya022.mediathor.record.obs.data.OpCodeData
 
 data class IdentifyData(val rpcVersion: Int, val authentication: String) : OpCodeData
 
-fun identify(authentication: String) = OpCode(1, IdentifyData(1, authentication))
+fun identify(authentication: String) = OpCode(OpCode.IDENTIFY, IdentifyData(1, authentication))

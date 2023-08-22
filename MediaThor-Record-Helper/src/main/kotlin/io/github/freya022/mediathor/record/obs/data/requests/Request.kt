@@ -11,5 +11,5 @@ sealed class Request<T : RequestData> : OpCodeData {
     val requestId: String = UUID.randomUUID().toString()
     abstract val requestData: T
 
-    fun toOpCode() = OpCode(6, this)
+    fun toOpCode() = OpCode(OpCode.REQUEST, this)
 }
