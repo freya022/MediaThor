@@ -48,7 +48,8 @@ suspend fun mountLocalDriveAsService(
         0
     }
 
-    thread(name = "'$serviceName' service thread") {
+    // Stop FS if all threads are daemons
+    thread(name = "'$serviceName' service thread", isDaemon = true) {
         // Blocking
         ServiceRunner.runAsService(serviceName, onStart, onStop)
     }
