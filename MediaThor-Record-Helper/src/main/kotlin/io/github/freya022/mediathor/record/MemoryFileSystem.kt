@@ -6,7 +6,6 @@ import com.github.jnrwinfspteam.jnrwinfsp.api.Mountable
 import com.github.jnrwinfspteam.jnrwinfsp.service.OnStart
 import com.github.jnrwinfspteam.jnrwinfsp.service.OnStop
 import com.github.jnrwinfspteam.jnrwinfsp.service.ServiceRunner
-import io.github.freya022.mediathor.record.memfs.FSMain
 import io.github.freya022.mediathor.record.memfs.WinFspMemFS
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
@@ -14,15 +13,16 @@ import kotlin.concurrent.thread
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
+import kotlin.io.path.Path
 
 private const val GB = 1024 * 1024 * 1024
 
-class MemoryFileSystem {
+class MemoryFileSystem(root: Char) {
     val memFS = WinFspMemFS("OBS Volatile Staging", 1 * GB, 4L * GB)
 
     init {
         runBlocking {
-            mountLocalDriveAsService("OBS Volatile FS", memFS, FSMain.root)
+            mountLocalDriveAsService("OBS Volatile FS", memFS, Path(root.toString()))
         }
     }
 }

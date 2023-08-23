@@ -2,15 +2,14 @@ package io.github.freya022.mediathor.record
 
 import io.github.freya022.mediathor.record.memfs.WinFspMemFS
 import org.koin.core.context.startKoin
-import org.koin.core.module.dsl.createdAtStart
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import org.koin.logger.slf4jLogger
 
 object Main {
     val appModule = module {
-        singleOf(::MemoryFileSystem) {
-            createdAtStart()
+        single(createdAtStart = true) {
+            MemoryFileSystem('O')
         }
         singleOf(MemoryFileSystem::memFS)
     }
