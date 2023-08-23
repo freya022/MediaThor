@@ -1,6 +1,11 @@
 package io.github.freya022.mediathor.record
 
-import io.github.freya022.mediathor.record.memfs.WinFspMemFS
+import atlantafx.base.theme.CupertinoDark
+import io.github.freya022.mediathor.record.ui.controller.RecordHelperController
+import io.github.freya022.mediathor.ui.utils.launchMainContext
+import javafx.application.Application
+import javafx.scene.Scene
+import javafx.stage.Stage
 import org.koin.core.context.startKoin
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
@@ -16,13 +21,20 @@ object Main {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val koin = startKoin {
+        startKoin {
             slf4jLogger()
 
             modules(appModule)
-        }.koin
+        }
 
-        val memFS: WinFspMemFS = koin.get()
+        launchMainContext {
+            Application.setUserAgentStylesheet(CupertinoDark().userAgentStylesheet)
+
+            Stage().apply {
+                val root = RecordHelperController()
+                scene = Scene(root)
+            }.show()
+        }
 
 //        thread {
 //            Thread.sleep(1000)

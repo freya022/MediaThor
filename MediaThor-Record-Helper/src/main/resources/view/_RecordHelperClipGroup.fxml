@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.layout.HBox?>
+<fx:root alignment="TOP_LEFT" styleClass="dense" text="1 clip - 2m -&gt; C:\Users\freya02\Videos\Replay 2023-08-21 19-12-29.mkv" type="TitledPane" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
+   <content>
+      <ScrollPane fitToHeight="true">
+         <content>
+            <HBox fx:id="clipBox" spacing="10.0" />
+         </content>
+      </ScrollPane>
+   </content>
+</fx:root>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.VBox?>
+<fx:root alignment="TOP_CENTER" spacing="3.0" styleClass="bg-subtle" type="VBox" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
+   <children>
+      <ImageView fx:id="thumbnailView" fitHeight="144.0" pickOnBounds="true" preserveRatio="true" />
+      <Pane prefHeight="10.0" />
+      <Label fx:id="timestampLabel" text="2023-08-21 19:12:29 - 12 minutes ago" />
+      <Label fx:id="durationLabel" text="2m" />
+   </children>
+   <padding>
+      <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+   </padding>
+</fx:root>
