@@ -92,5 +92,13 @@
             <groupId>io.ktor</groupId>
             <artifactId>ktor-serialization-gson-jvm</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.insert-koin</groupId>
+            <artifactId>koin-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.insert-koin</groupId>
+            <artifactId>koin-logger-slf4j</artifactId>
+        </dependency>
     </dependencies>
 </project>

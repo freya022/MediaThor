@@ -33,6 +33,7 @@
 
         <ktor.version>2.3.3</ktor.version>
         <javafx.version>20.0.1</javafx.version>
+        <koin.version>3.4.3</koin.version>
     </properties>
 
     <repositories>
@@ -193,6 +194,16 @@
                 <groupId>io.ktor</groupId>
                 <artifactId>ktor-serialization-gson-jvm</artifactId>
                 <version>${ktor.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.insert-koin</groupId>
+                <artifactId>koin-core</artifactId>
+                <version>${koin.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.insert-koin</groupId>
+                <artifactId>koin-logger-slf4j</artifactId>
+                <version>${koin.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

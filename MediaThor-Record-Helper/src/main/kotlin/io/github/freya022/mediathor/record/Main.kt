@@ -1,17 +1,29 @@
 package io.github.freya022.mediathor.record
 
-import com.github.jnrwinfspteam.jnrwinfsp.service.ServiceRunner
-import io.github.freya022.mediathor.record.memfs.FSMain
 import io.github.freya022.mediathor.record.memfs.WinFspMemFS
+import org.koin.core.context.startKoin
+import org.koin.core.module.dsl.createdAtStart
+import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.module
+import org.koin.logger.slf4jLogger
 
 object Main {
-    private const val GB = 1024 * 1024 * 1024
+    val appModule = module {
+        singleOf(::MemoryFileSystem) {
+            createdAtStart()
+        }
+        singleOf(MemoryFileSystem::memFS)
+    }
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val memFS = WinFspMemFS("OBS Volatile Staging", 1 * GB, 4L * GB)
+        val koin = startKoin {
+            slf4jLogger()
 
-        RecordWatcher(memFS)
+            modules(appModule)
+        }.koin
+
+        val memFS: WinFspMemFS = koin.get()
 
 //        thread {
 //            Thread.sleep(1000)
@@ -20,7 +32,5 @@ object Main {
 //            Path("C:\\Users\\freya02\\Videos\\Replay 2023-08-11 18-23-04.mkv").copyTo(memFS.mountPointPath.resolve("second.mkv"))
 //            Path("C:\\Users\\freya02\\Videos\\Replay 2023-08-12 16-49-27.mkv").copyTo(memFS.mountPointPath.resolve("unrelated.mkv"))
 //        }
-
-        ServiceRunner.mountLocalDriveAsService("OBS Volatile FS", memFS, FSMain.root)
     }
 }
