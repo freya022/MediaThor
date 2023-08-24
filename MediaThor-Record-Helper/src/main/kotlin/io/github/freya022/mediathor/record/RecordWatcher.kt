@@ -8,7 +8,6 @@ import io.github.freya022.mediathor.utils.*
 import kotlinx.coroutines.*
 import mu.two.KotlinLogging
 import java.io.ByteArrayOutputStream
-import java.io.IOException
 import java.math.BigDecimal
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
@@ -129,24 +128,28 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
     }
 
     private suspend fun getClipDuration(path: ClipPath): Duration = withContext(Dispatchers.IO) {
-        val outputStream = ByteArrayOutputStream()
-        val errorStream = ByteArrayOutputStream()
-        ProcessBuilder()
-            .directory(memFS.mountPointPath)
-            .command(
-                "ffprobe",
-                "-v", "warning",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                path.absolutePathString())
-            .start()
-            .redirectOutputs(outputStream, errorStream)
-            .waitFor(logger, outputStream, errorStream)
-            .also { if (it.exitValue() != 0) throw IOException() }
+        try {
+            val outputStream = ByteArrayOutputStream()
+            val errorStream = ByteArrayOutputStream()
+            ProcessBuilder()
+                .directory(memFS.mountPointPath)
+                .command(
+                    "ffprobe",
+                    "-v", "warning",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    path.absolutePathString())
+                .start()
+                .redirectOutputs(outputStream, errorStream)
+                .waitFor(logger, outputStream, errorStream)
 
-        val durationSeconds = outputStream.toByteArray().decodeToString().trim().toBigDecimal()
-        val durationMilliseconds = (durationSeconds * 1000.toBigDecimal()).longValueExact()
-        durationMilliseconds.toDuration(DurationUnit.MILLISECONDS)
+            val durationSeconds = outputStream.toByteArray().decodeToString().trim().toBigDecimal()
+            val durationMilliseconds = (durationSeconds * 1000.toBigDecimal()).longValueExact()
+            durationMilliseconds.toDuration(DurationUnit.MILLISECONDS)
+        } catch (e: Exception) {
+            logger.catching(e)
+            Duration.ZERO
+        }
     }
 
     @OptIn(ExperimentalPathApi::class)
@@ -266,6 +269,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
             .start()
             .redirectOutputs(outputStream, errorStream)
             .waitFor(logger, outputStream, errorStream)
+            .throwOnExitCode()
 
         logger.info { "Merged ${clips.joinToString { it.path.name }} into $mergePath" }
 
@@ -295,7 +299,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
             .start()
             .redirectOutputs(outputStream, errorStream)
             .waitFor(logger, outputStream, errorStream)
-            .also { if (it.exitValue() != 0) throw IOException() }
+            .throwOnExitCode()
 
         // Read each line as a timestamp
         outputStream.toByteArray().decodeToString().trim().lines()
@@ -316,7 +320,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
             .start()
             .redirectOutputs(outputStream, errorStream)
             .waitFor(logger, outputStream, errorStream)
-            .also { if (it.exitValue() != 0) throw IOException() }
+            .throwOnExitCode()
 
         // Read the last line as an integer
         outputStream.toByteArray().decodeToString().trim().lines().last().toInt()
@@ -356,6 +360,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
             .start()
             .redirectOutputs(outputStream, errorStream)
             .waitFor(logger, outputStream, errorStream)
+            // Don't throw on error, this is not fatal and will fall back to a singleton group
 
         logger.info { "Extracted keyframes of $clipPath" }
         keyframesFolder
