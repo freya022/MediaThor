@@ -2,6 +2,8 @@ package io.github.freya022.mediathor.record
 
 import atlantafx.base.theme.CupertinoDark
 import io.github.freya022.mediathor.record.ui.controller.RecordHelperController
+import io.github.freya022.mediathor.record.watcher.RecordWatcher
+import io.github.freya022.mediathor.record.watcher.RecordWatcherImpl
 import io.github.freya022.mediathor.ui.utils.launchMainContext
 import javafx.application.Application
 import javafx.scene.Scene
