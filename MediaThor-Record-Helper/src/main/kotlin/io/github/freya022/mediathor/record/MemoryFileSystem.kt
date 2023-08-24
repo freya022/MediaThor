@@ -22,7 +22,7 @@ class MemoryFileSystem(root: Char) {
 
     init {
         runBlocking {
-            mountLocalDriveAsService("OBS Volatile FS", memFS, Path(root.toString()))
+            mountLocalDriveAsService("OBS Volatile FS", memFS, Path("${root}:"))
         }
     }
 }
