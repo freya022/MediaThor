@@ -97,9 +97,7 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
      */
     context(CoroutineScope)
     private suspend fun onNewVideo(clipPath: ClipPath) {
-        val keyframesFolder = extractKeyframes(clipPath)
-
-        val keyframeIndexByHash = hashKeyframes(clipPath, keyframesFolder)
+        val keyframeIndexByHash = hashKeyframes(clipPath)
         val createdAt = (clipPath.getAttribute("creationTime") as FileTime).toInstant()
         val duration = getClipDuration(clipPath)
 
@@ -111,13 +109,27 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
 
     private suspend fun createClipGroup(): ClipGroupImpl {
         val clipGroup = ClipGroupImpl()
+        clipGroup.addListener(object : ClipGroupListener {
+            override suspend fun onClipAdded(clip: Clip) {}
+
+            override suspend fun onClipRemoved(clip: Clip) {
+                cleanup(listOf(clip))
+            }
+        })
         listeners.forEach { it.onClipGroupAdded(clipGroup) }
         return clipGroup
     }
 
     override suspend fun removeClipGroup(clipGroup: ClipGroup) {
         clipGroups -= clipGroup
+        cleanup(clipGroup.clips)
         listeners.forEach { it.onClipGroupRemoved(clipGroup) }
+    }
+
+    private fun cleanup(clips: List<Clip>) {
+        logger.debug { "Deleting source files: ${clips.joinToString { it.path.absolutePathString() }}" }
+        clips.forEach { it.path.deleteExisting() }
+        logger.info { "Deleted source files: ${clips.joinToString { it.path.absolutePathString() }}" }
     }
 
     private fun findClipGroup(clipPath: ClipPath, keyframeIndexByHash: Map<KeyframeHash, KeyframeIndex>): ClipGroupImpl? {
@@ -164,7 +176,6 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
         }
     }
 
-    @OptIn(ExperimentalPathApi::class)
     override suspend fun flushGroup(clipGroup: ClipGroup) = withContext(Dispatchers.IO) {
         val clips = clipGroup.clips
 
@@ -177,10 +188,12 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
 
             // Copy
             previousVideoPath.moveTo(copyPath)
-            // Delete keyframes
-            getKeyframeFolder(previousVideoPath).deleteRecursively()
 
             logger.info { "Moved $previousVideoPath into $copyPath" }
+
+            // Delete group and cleanup
+            removeClipGroup(clipGroup)
+
             return@withContext
         }
 
@@ -286,13 +299,6 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
         logger.info { "Merged ${clips.joinToString { it.path.name }} into $mergePath" }
 
         removeClipGroup(clipGroup)
-
-        logger.debug { "Deleting source files: ${clips.joinToString { it.path.absolutePathString() }}" }
-        clips.forEach {
-            getKeyframeFolder(it.path).deleteRecursively()
-            it.path.deleteExisting()
-        }
-        logger.info { "Deleted source files: ${clips.joinToString { it.path.absolutePathString() }}" }
     }
 
     private suspend fun getKeyframeTimestamps(path: ClipPath): List<KeyframeTimestamp> = withContext(Dispatchers.IO) {
@@ -355,7 +361,9 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
     private suspend fun extractKeyframes(clipPath: ClipPath): KeyframeFolder = withContext(Dispatchers.IO) {
         logger.debug { "Extracting keyframes from $clipPath" }
 
-        val keyframesFolder = getKeyframeFolder(clipPath).createDirectory()
+        val keyframesFolder = memFS.mountPointPath
+            .resolve("${clipPath.nameWithoutExtension} - Keyframes")
+            .createDirectory()
 
         val outputStream = ByteArrayOutputStream()
         val errorStream = ByteArrayOutputStream()
@@ -368,21 +376,21 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
                 "-i", clipPath.absolutePathString(),
                 "-vsync", "0",
                 "-f", "image2",
-                "${keyframesFolder.absolutePathString()}/keyframe-0%3d.png")
+                "${keyframesFolder.absolutePathString()}/keyframe-0%3d.png"
+            )
             .start()
             .redirectOutputs(outputStream, errorStream)
             .waitFor(logger, outputStream, errorStream)
-            // Don't throw on error, this is not fatal and will fall back to a singleton group
+        // Don't throw on error, this is not fatal and will fall back to a singleton group
 
         logger.info { "Extracted keyframes of $clipPath" }
         keyframesFolder
     }
 
-    private fun getKeyframeFolder(clipPath: ClipPath): KeyframeFolder =
-        memFS.mountPointPath.resolve("${clipPath.nameWithoutExtension} - Keyframes")
-
     @OptIn(ExperimentalPathApi::class)
-    private fun hashKeyframes(clipPath: ClipPath, keyframesFolder: KeyframeFolder): Map<String, Int> {
+    private suspend fun hashKeyframes(clipPath: ClipPath): Map<String, Int> = withContext(Dispatchers.IO) {
+        val keyframesFolder = extractKeyframes(clipPath)
+
         logger.debug { "Hashing keyframes from $clipPath" }
 
         //TODO optimize using direct FileObj access
@@ -397,6 +405,11 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
             }
 
         logger.info { "Hashed keyframes of $clipPath" }
-        return keyframeIndexByHash
+
+        logger.debug { "Cleaning up keyframes" }
+        keyframesFolder.deleteRecursively()
+        logger.info { "Cleaned up keyframes" }
+
+        keyframeIndexByHash
     }
 }
