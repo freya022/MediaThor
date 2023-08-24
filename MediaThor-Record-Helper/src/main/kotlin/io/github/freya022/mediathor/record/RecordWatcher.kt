@@ -7,6 +7,8 @@ import io.github.freya022.mediathor.record.watcher.*
 import io.github.freya022.mediathor.utils.*
 import kotlinx.coroutines.*
 import mu.two.KotlinLogging
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 import java.io.ByteArrayOutputStream
 import java.math.BigDecimal
 import java.nio.file.Path
@@ -22,13 +24,22 @@ private typealias KeyframeTimestamp = String
 
 private val logger = KotlinLogging.logger { }
 
-class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
+interface RecordWatcher {
+    fun addListener(listener: RecordWatcherListener)
+    fun removeClipGroup(clipGroup: ClipGroup)
+
+    suspend fun flushGroup(clipGroup: ClipGroup)
+}
+
+class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
     private class InputClip(val clip: Clip, val keyframeTimestamps: List<KeyframeTimestamp>, val audioStreams: Int) {
         val path: Path get() = clip.path
 
         var startTimestamp: String? = null
         var endTimestamp: String? = null
     }
+
+    private val memFS: WinFspMemFS = get()
 
     private val scope = getDefaultScope(newExecutor(1, daemon = true) { threadNumber -> name = "RecordWatcher thread #$threadNumber" }.asCoroutineDispatcher())
     private val clipGroups: MutableList<ClipGroup> = arrayListOf()
@@ -40,7 +51,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         memFS.addListener(this)
     }
 
-    fun addListener(listener: RecordWatcherListener) {
+    override fun addListener(listener: RecordWatcherListener) {
         listeners += listener
     }
 
@@ -103,7 +114,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         return clipGroup
     }
 
-    fun removeClipGroup(clipGroup: ClipGroup) {
+    override fun removeClipGroup(clipGroup: ClipGroup) {
         clipGroups -= clipGroup
         listeners.forEach { it.onClipGroupRemoved(clipGroup) }
     }
@@ -153,7 +164,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
     }
 
     @OptIn(ExperimentalPathApi::class)
-    suspend fun flushGroup(clipGroup: ClipGroup) = withContext(Dispatchers.IO) {
+    override suspend fun flushGroup(clipGroup: ClipGroup) = withContext(Dispatchers.IO) {
         val clips = clipGroup.clips
 
         val copyPath = Data.videosFolder.resolve(clips.last().path.name)

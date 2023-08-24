@@ -17,6 +17,7 @@ object Main {
             MemoryFileSystem('O')
         }
         singleOf(MemoryFileSystem::memFS)
+        single<RecordWatcher> { RecordWatcherImpl() }
     }
 
     @JvmStatic
