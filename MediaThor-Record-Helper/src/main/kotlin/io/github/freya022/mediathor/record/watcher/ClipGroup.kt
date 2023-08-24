@@ -3,9 +3,9 @@ package io.github.freya022.mediathor.record.watcher
 import java.util.*
 
 interface ClipGroupListener {
-    fun onClipAdded(clip: Clip)
+    suspend fun onClipAdded(clip: Clip)
 
-    fun onClipRemoved(clip: Clip)
+    suspend fun onClipRemoved(clip: Clip)
 }
 
 interface ClipGroup {
@@ -13,7 +13,7 @@ interface ClipGroup {
 
     fun addListener(listener: ClipGroupListener)
 
-    fun deleteClip(clip: Clip): Boolean
+    suspend fun deleteClip(clip: Clip): Boolean
 }
 
 class ClipGroupImpl : ClipGroup {
@@ -26,7 +26,7 @@ class ClipGroupImpl : ClipGroup {
         listeners += listener
     }
 
-    override fun deleteClip(clip: Clip): Boolean {
+    override suspend fun deleteClip(clip: Clip): Boolean {
         return _clips.remove(clip).also { removed ->
             if (removed) {
                 listeners.forEach { it.onClipRemoved(clip) }
@@ -34,7 +34,7 @@ class ClipGroupImpl : ClipGroup {
         }
     }
 
-    fun addClip(clip: Clip) {
+    suspend fun addClip(clip: Clip) {
         _clips += clip
         listeners.forEach { it.onClipAdded(clip) }
     }

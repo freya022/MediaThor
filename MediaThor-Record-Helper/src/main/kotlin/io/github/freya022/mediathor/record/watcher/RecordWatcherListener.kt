@@ -1,7 +1,7 @@
 package io.github.freya022.mediathor.record.watcher
 
 interface RecordWatcherListener {
-    fun onClipGroupAdded(clipGroup: ClipGroup)
+    suspend fun onClipGroupAdded(clipGroup: ClipGroup)
 
-    fun onClipGroupRemoved(clipGroup: ClipGroup)
+    suspend fun onClipGroupRemoved(clipGroup: ClipGroup)
 }
