@@ -1,6 +1,10 @@
 package io.github.freya022.mediathor.record.watcher
 
+import io.github.freya022.mediathor.record.Data
+import java.nio.file.Path
 import java.util.*
+import kotlin.io.path.name
+import kotlin.io.path.nameWithoutExtension
 
 interface ClipGroupListener {
     suspend fun onClipAdded(clip: Clip)
@@ -10,6 +14,7 @@ interface ClipGroupListener {
 
 interface ClipGroup {
     val clips: List<Clip>
+    val outputPath: Path
 
     fun addListener(listener: ClipGroupListener)
 
@@ -19,6 +24,16 @@ interface ClipGroup {
 class ClipGroupImpl : ClipGroup {
     private val _clips: MutableList<Clip> = arrayListOf()
     override val clips: List<Clip> get() = Collections.unmodifiableList(_clips)
+
+    override val outputPath: Path
+        get() {
+            val copyPath = Data.videosFolder.resolve(clips.last().path.name)
+            return when (_clips.size) {
+                1 -> copyPath
+                // Use a .mp4 merged path
+                else -> copyPath.resolveSibling(copyPath.nameWithoutExtension + ".mp4")
+            }
+        }
 
     private val listeners: MutableList<ClipGroupListener> = arrayListOf()
 

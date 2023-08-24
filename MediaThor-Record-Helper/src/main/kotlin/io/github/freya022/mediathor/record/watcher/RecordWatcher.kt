@@ -1,6 +1,5 @@
 package io.github.freya022.mediathor.record.watcher
 
-import io.github.freya022.mediathor.record.Data
 import io.github.freya022.mediathor.record.Sequencer
 import io.github.freya022.mediathor.record.memfs.FileObj
 import io.github.freya022.mediathor.record.memfs.MemFSListener
@@ -179,17 +178,17 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
     override suspend fun flushGroup(clipGroup: ClipGroup) = withContext(Dispatchers.IO) {
         val clips = clipGroup.clips
 
-        val copyPath = Data.videosFolder.resolve(clips.last().path.name)
+        val outputPath = clipGroup.outputPath
 
         // If there is only one previous clip, copy to disk
         if (clips.size == 1) {
             val previousVideoPath = clips.single().path
-            logger.debug { "Moving $previousVideoPath into $copyPath" }
+            logger.debug { "Moving $previousVideoPath into $outputPath" }
 
             // Copy
-            previousVideoPath.moveTo(copyPath)
+            previousVideoPath.moveTo(outputPath)
 
-            logger.info { "Moved $previousVideoPath into $copyPath" }
+            logger.info { "Moved $previousVideoPath into $outputPath" }
 
             // Delete group and cleanup
             removeClipGroup(clipGroup)
@@ -199,8 +198,6 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
 
         // Merge previous videos to disk
         logger.debug { "Merging ${clips.joinToString { it.path.name }}" }
-
-        val mergePath = copyPath.resolveSibling(copyPath.nameWithoutExtension + ".mp4")
 
         val inputs = clips.map {
             val timestamps = getKeyframeTimestamps(it.path)
@@ -289,14 +286,14 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
                 "-multipass", "0",
                 "-profile:v", "high",
                 "-tune", "hq",
-                mergePath.absolutePathString()
+                outputPath.absolutePathString()
             )
             .start()
             .redirectOutputs(outputStream, errorStream)
             .waitFor(logger, outputStream, errorStream)
             .throwOnExitCode()
 
-        logger.info { "Merged ${clips.joinToString { it.path.name }} into $mergePath" }
+        logger.info { "Merged ${clips.joinToString { it.path.name }} into $outputPath" }
 
         removeClipGroup(clipGroup)
     }
