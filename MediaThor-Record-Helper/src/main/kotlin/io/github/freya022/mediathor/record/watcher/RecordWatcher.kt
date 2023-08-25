@@ -43,7 +43,8 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
 
     private val scope = getDefaultScope(newExecutor(1, daemon = true) { threadNumber -> name = "RecordWatcher thread #$threadNumber" }.asCoroutineDispatcher())
     private val clipGroups: MutableList<ClipGroup> = arrayListOf()
-    private val listeners: MutableList<RecordWatcherListener> = arrayListOf()
+    private val _listeners: MutableList<RecordWatcherListener> = arrayListOf()
+    private val listeners get() = _listeners.toList()
 
     private val newVideoSequencer = Sequencer(scope)
 
@@ -52,7 +53,7 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
     }
 
     override fun addListener(listener: RecordWatcherListener) {
-        listeners += listener
+        _listeners += listener
     }
 
     override fun onNewFileClosed(fileObj: FileObj) {

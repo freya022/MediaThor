@@ -35,10 +35,11 @@ class ClipGroupImpl : ClipGroup {
             }
         }
 
-    private val listeners: MutableList<ClipGroupListener> = arrayListOf()
+    private val _listeners: MutableList<ClipGroupListener> = arrayListOf()
+    private val listeners get() = _listeners.toList()
 
     override fun addListener(listener: ClipGroupListener) {
-        listeners += listener
+        _listeners += listener
     }
 
     override suspend fun deleteClip(clip: Clip): Boolean {
