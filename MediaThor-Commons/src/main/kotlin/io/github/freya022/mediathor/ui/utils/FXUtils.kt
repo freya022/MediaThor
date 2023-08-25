@@ -24,6 +24,16 @@ fun <T> loadFxml(controller: T, name: String): T = FXMLLoader().apply {
     setController(controller)
 }.load(FXUtils::class.java.getResourceAsStream("/view/$name.fxml"))
 
+fun Node.toggleStyleClass(styleClass: String) {
+    val classes = getStyleClass()
+    val idx: Int = classes.indexOf(styleClass)
+    if (idx >= 0) {
+        classes.removeAt(idx)
+    } else {
+        classes.add(styleClass)
+    }
+}
+
 inline fun <R> withAnimationTimer(crossinline action: () -> Unit, block: () -> R): R {
     val animationTimer = object : AnimationTimer() {
         override fun handle(now: Long) = action()
