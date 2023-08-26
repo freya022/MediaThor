@@ -1,6 +1,8 @@
 package io.github.freya022.mediathor.record.obs.data.requests
 
-class GetStats : Request<GetStats.Data>() {
+import io.github.freya022.mediathor.record.obs.OBS
+
+class GetStats(obs: OBS) : Request<GetStats.Data>(obs) {
     data object Data : RequestData
 
     override val requestType: String = "GetStats"

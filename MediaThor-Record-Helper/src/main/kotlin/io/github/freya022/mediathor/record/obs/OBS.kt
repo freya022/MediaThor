@@ -58,6 +58,8 @@ class OBS(private val host: String, private val port: Int, private val password:
 
     private val listeners: MutableList<OBSListener> = CopyOnWriteArrayList()
 
+    val replayBuffer = ReplayBuffer(this)
+
     fun addListener(listener: OBSListener) {
         listeners += listener
     }
@@ -177,25 +179,24 @@ class OBS(private val host: String, private val port: Int, private val password:
     }
 
     fun close() {
-        readJob.cancel()
+        if (::readJob.isInitialized) {
+            readJob.cancel()
+        }
     }
 
-    suspend fun getStats(): GetStatsData = GetStats().await()
-
-    suspend fun startReplayBuffer(): NullRequestResponse = StartReplayBuffer().await()
-    suspend fun stopReplayBuffer(): NullRequestResponse = StopReplayBuffer().await()
-    suspend fun saveReplayBuffer(): NullRequestResponse = SaveReplayBuffer().await()
+    suspend fun getStats(): GetStatsData = GetStats(this).await()
 
     @Suppress("UNCHECKED_CAST")
-    private suspend inline fun <reified R : RequestResponseData> Request<*>.await(): R = suspendCancellableCoroutine {
-        it.invokeOnCancellation { requestContinuations.remove(this.requestId) }
+    suspend fun <R : RequestResponseData> await(
+        request: Request<*>,
+        typeToken: TypeToken<OpCode<RequestResponse<R>>>
+    ): R = suspendCancellableCoroutine {
+        it.invokeOnCancellation { requestContinuations.remove(request.requestId) }
 
-        val typeToken = object : TypeToken<OpCode<RequestResponse<R>>>() {}
-
-        requestContinuations[this.requestId] = RequestContinuation(typeToken as TypeToken<OpCode<RequestResponse<*>>>, it)
-        val exception = opCodeChannel.trySendBlocking(this.toOpCode()).exceptionOrNull()
+        requestContinuations[request.requestId] = RequestContinuation(typeToken as TypeToken<OpCode<RequestResponse<*>>>, it)
+        val exception = opCodeChannel.trySendBlocking(request.toOpCode()).exceptionOrNull()
         if (exception != null) {
-            requestContinuations.remove(this.requestId)
+            requestContinuations.remove(request.requestId)
             return@suspendCancellableCoroutine it.resumeWithException(exception)
         }
     } as R

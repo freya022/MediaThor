@@ -12,11 +12,11 @@ object ObsWSMain {
 
         println("stats = ${obs.getStats()}")
 
-        obs.startReplayBuffer()
+        obs.replayBuffer.start()
 
         delay(5.seconds)
 
-        obs.stopReplayBuffer()
+        obs.replayBuffer.stop()
 
         println("stats = ${obs.getStats()}")
 
