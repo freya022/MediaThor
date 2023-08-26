@@ -28,6 +28,6 @@ class Clip(
     }
 
     override fun toString(): String {
-        return "Clip(path=$path, group=$group)"
+        return "Clip(path=$path)"
     }
 }
