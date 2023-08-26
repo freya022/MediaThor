@@ -6,6 +6,8 @@ import com.google.gson.reflect.TypeToken
 import io.github.freya022.mediathor.record.obs.data.OpCode
 import io.github.freya022.mediathor.record.obs.data.connect.Hello
 import io.github.freya022.mediathor.record.obs.data.connect.IdentifyData
+import io.github.freya022.mediathor.record.obs.data.events.Event
+import io.github.freya022.mediathor.record.obs.data.events.ReplayBufferStateChangedEvent
 import io.github.freya022.mediathor.record.obs.data.receiveGateway
 import io.github.freya022.mediathor.record.obs.data.requests.*
 import io.github.freya022.mediathor.utils.getDefaultScope
@@ -24,6 +26,7 @@ import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.channels.trySendBlocking
 import mu.two.KotlinLogging
 import java.security.MessageDigest
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -52,6 +55,12 @@ class OBS(private val host: String, private val port: Int, private val password:
     private val opCodeChannel = Channel<OpCode<*>>()
 
     private val requestContinuations: MutableMap<String, RequestContinuation> = hashMapOf()
+
+    private val listeners: MutableList<OBSListener> = CopyOnWriteArrayList()
+
+    fun addListener(listener: OBSListener) {
+        listeners += listener
+    }
 
     suspend fun start(): OBS = suspendCoroutine { continuation ->
         readScope.launch {
@@ -128,8 +137,9 @@ class OBS(private val host: String, private val port: Int, private val password:
                 val text = (incoming.receive() as Frame.Text).readText()
                 val obj = gson.fromJson(text, JsonObject::class.java)
                 val op = obj["op"].asInt
+                val d = obj["d"].asJsonObject
                 if (op == OpCode.REQUEST_RESPONSE) {
-                    val requestId: String = obj["d"].asJsonObject["requestId"].asString
+                    val requestId: String = d["requestId"].asString
                     val continuation = requestContinuations.remove(requestId)
                     if (continuation == null) {
                         logger.warn { "Could not find RequestContinuation '$requestId'" }
@@ -142,6 +152,17 @@ class OBS(private val host: String, private val port: Int, private val password:
                         continuation.continuation.resumeWithException(OBSException(code, comment))
                     }
                     continuation.continuation.resume(data ?: NullRequestResponse)
+                } else if (op == OpCode.EVENT) {
+                    val eventType = d["eventType"].asString
+                    val event: Event? = when (eventType) {
+                        "ReplayBufferStateChanged" -> gson.fromJson(d["eventData"], ReplayBufferStateChangedEvent::class.java)
+                        else -> null
+                    }
+                    if (event == null) {
+                        logger.debug { "Unknown event type: $eventType" }
+                        continue
+                    }
+                    listeners.forEach { it.onEvent(event) }
                 }
             } catch (e: ClosedReceiveChannelException) {
                 val closeReason = closeReason.await()
