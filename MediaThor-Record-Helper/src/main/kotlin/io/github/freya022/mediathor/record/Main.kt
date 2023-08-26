@@ -18,9 +18,7 @@ object Main {
         singleOf(MemoryFileSystem::memFS)
         single<RecordWatcher>(createdAtStart = true) { RecordWatcherImpl() }
         single(createdAtStart = true) {
-            runBlocking {
-                OBS("127.0.0.1", 4455, Config.config.obsPassword).start()
-            }
+            OBS("127.0.0.1", 4455, Config.config.obsPassword)
         }
         singleOf(OBS::replayBuffer)
     }

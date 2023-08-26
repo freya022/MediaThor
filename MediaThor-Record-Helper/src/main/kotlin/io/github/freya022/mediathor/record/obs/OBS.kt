@@ -58,13 +58,19 @@ class OBS(private val host: String, private val port: Int, private val password:
 
     private val listeners: MutableList<OBSListener> = CopyOnWriteArrayList()
 
+    init {
+        runBlocking(Dispatchers.IO) {
+            start()
+        }
+    }
+
     val replayBuffer = ReplayBuffer(this)
 
     fun addListener(listener: OBSListener) {
         listeners += listener
     }
 
-    suspend fun start(): OBS = suspendCoroutine { continuation ->
+    private suspend fun start(): OBS = suspendCoroutine { continuation ->
         readScope.launch {
             runCatching {
                 client.webSocket(host = host, port = port, request = {
