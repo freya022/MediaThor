@@ -1,17 +1,21 @@
 package io.github.freya022.mediathor.record.ui.controller
 
+import io.github.freya022.mediathor.record.obs.ReplayBuffer
+import io.github.freya022.mediathor.record.obs.data.events.ReplayBufferStateChangedEvent
+import io.github.freya022.mediathor.record.obs.listener
 import io.github.freya022.mediathor.record.watcher.ClipGroup
 import io.github.freya022.mediathor.record.watcher.RecordWatcher
 import io.github.freya022.mediathor.record.watcher.RecordWatcherListener
-import io.github.freya022.mediathor.ui.utils.loadFxml
-import io.github.freya022.mediathor.ui.utils.withMainContext
+import io.github.freya022.mediathor.ui.utils.*
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
 import javafx.scene.control.Button
 import javafx.scene.layout.HBox
 import javafx.scene.layout.VBox
+import kotlinx.coroutines.runBlocking
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
+import org.kordamp.ikonli.javafx.FontIcon
 
 class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
     @FXML
@@ -25,6 +29,8 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
 
     @FXML
     private lateinit var replayBufferButton: Button
+
+    private val replayBuffer: ReplayBuffer = get()
 
     private val recordWatcher: RecordWatcher = get()
     private val controllerByClipGroup: MutableMap<ClipGroup, ClipGroupController> = hashMapOf()
@@ -44,15 +50,28 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
         clipGroupsBox.children -= controllerByClipGroup.remove(clipGroup)
     }
 
-    fun updateButtons() {
+    fun updateButtons() = runBlocking(uiScope.coroutineContext) {
         val hasSelectedClips = controllerByClipGroup.values.any { it.selections.isNotEmpty() }
         deleteButton.isDisable = !hasSelectedClips
         flushButton.isDisable = !hasSelectedClips
+
+        replayBufferButton.text = when {
+            replayBuffer.isActive -> "Stop replay buffer"
+            else -> "Start replay buffer"
+        }
+        (replayBufferButton.graphic as FontIcon).iconLiteral = when {
+            replayBuffer.isActive -> "mdrmz-pause"
+            else -> "mdrmz-play_arrow"
+        }
     }
 
     @FXML
     private fun initialize() {
-
+        updateButtons()
+        replayBuffer.obs.listener<ReplayBufferStateChangedEvent> {
+            // The internal state is already updated at this point
+            updateButtons()
+        }
     }
 
     @FXML
@@ -66,7 +85,14 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
     }
 
     @FXML
-    fun onReplayBufferAction(event: ActionEvent) {
-
+    fun onReplayBufferAction(event: ActionEvent) = launchMainContext {
+        replayBufferButton.withDebounce(replayBufferButton.text) {
+            if (replayBuffer.isActive) {
+                replayBuffer.stop()
+            } else {
+                replayBuffer.start()
+            }
+        }
+        updateButtons()
     }
 }
