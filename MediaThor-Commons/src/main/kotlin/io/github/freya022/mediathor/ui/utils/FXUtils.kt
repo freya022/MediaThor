@@ -9,7 +9,7 @@ import kotlinx.coroutines.*
 
 private object FXUtils {}
 
-private val uiScope = getDefaultScope(Dispatchers.Main.immediate)
+val uiScope = getDefaultScope(Dispatchers.Main.immediate)
 
 fun launchMainContext(block: suspend CoroutineScope.() -> Unit): Job {
     return uiScope.launch(block = block)
