@@ -8,7 +8,7 @@ import kotlin.concurrent.withLock
 
 interface RequestData
 
-sealed class Request<T : RequestData>(val obs: OBS) : OpCodeData {
+sealed class Request<T : RequestData>(@Transient val obs: OBS) : OpCodeData {
     abstract val requestType: String
     val requestId: String = nextId()
     abstract val requestData: T
