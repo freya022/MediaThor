@@ -101,7 +101,7 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
         val createdAt = (clipPath.getAttribute("creationTime") as FileTime).toInstant()
         val duration = getClipDuration(clipPath)
 
-        val clipGroup = findClipGroup(clipPath, keyframeIndexByHash) ?: createClipGroup()
+        val clipGroup = findClipGroup(keyframeIndexByHash) ?: createClipGroup()
 
         val currentClip = Clip(clipPath, clipGroup, createdAt, duration, keyframeIndexByHash)
         clipGroup.addClip(currentClip)
@@ -109,6 +109,7 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
 
     private suspend fun createClipGroup(): ClipGroupImpl {
         val clipGroup = ClipGroupImpl()
+        clipGroups += clipGroup
         clipGroup.addListener(object : ClipGroupListener {
             override suspend fun onClipAdded(clip: Clip) {}
 
@@ -132,23 +133,12 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
         logger.info { "Deleted source files: ${clips.joinToString { it.path.absolutePathString() }}" }
     }
 
-    private fun findClipGroup(clipPath: ClipPath, keyframeIndexByHash: Map<KeyframeHash, KeyframeIndex>): ClipGroupImpl? {
-        val clips = clipGroups.flatMap { it.clips }
-
-        // Need at least two videos
-        if (clips.size > 1) {
-            // Find matching keyframe with previous video
-            val previousClip = clips[clips.size - 2]
-
-            logger.debug { "Trying to match keyframes between $clipPath and ${previousClip.path}" }
-
-            // Simply check if two frames match, no info is required
-            if (previousClip.sharesKeyframe(keyframeIndexByHash)) {
-                return previousClip.group as ClipGroupImpl
-            }
-        }
-
-        return null
+    private fun findClipGroup(keyframeIndexByHash: Map<KeyframeHash, KeyframeIndex>): ClipGroupImpl? {
+        // Find a group where a clip's keyframes match one of ours
+        return clipGroups
+            .find { group ->
+                group.clips.any { it.sharesKeyframe(keyframeIndexByHash) }
+            } as? ClipGroupImpl
     }
 
     private suspend fun getClipDuration(path: ClipPath): Duration = withContext(Dispatchers.IO) {
