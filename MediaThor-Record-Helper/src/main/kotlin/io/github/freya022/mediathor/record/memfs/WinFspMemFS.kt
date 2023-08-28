@@ -8,6 +8,7 @@ import jnr.ffi.Pointer
 import mu.two.KotlinLogging
 import java.nio.file.Path
 import java.util.*
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.locks.ReentrantLock
 import java.util.function.Predicate
 import kotlin.concurrent.withLock
@@ -30,7 +31,7 @@ class WinFspMemFS(
     private val lock = ReentrantLock()
 
     private val objects: MutableMap<String, MemoryObj> = hashMapOf()
-    private val listeners: MutableList<MemFSListener> = arrayListOf()
+    private val listeners: MutableList<MemFSListener> = CopyOnWriteArrayList()
 
     private var nextIndexNumber: Long = 1L
 

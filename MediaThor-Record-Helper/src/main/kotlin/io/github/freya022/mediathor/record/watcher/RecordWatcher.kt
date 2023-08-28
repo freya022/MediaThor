@@ -13,6 +13,7 @@ import java.io.ByteArrayOutputStream
 import java.math.BigDecimal
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.io.path.*
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
@@ -45,8 +46,7 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
 
     private val scope = getDefaultScope(newExecutor(1, daemon = true) { threadNumber -> name = "RecordWatcher thread #$threadNumber" }.asCoroutineDispatcher())
     private val clipGroups: MutableList<ClipGroup> = arrayListOf()
-    private val _listeners: MutableList<RecordWatcherListener> = arrayListOf()
-    private val listeners get() = _listeners.toList()
+    private val listeners: MutableList<RecordWatcherListener> = CopyOnWriteArrayList()
 
     private val newVideoSequencer = Sequencer(scope)
 
@@ -55,7 +55,7 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
     }
 
     override fun addListener(listener: RecordWatcherListener) {
-        _listeners += listener
+        listeners += listener
     }
 
     override fun onNewFileClosed(fileObj: FileObj) {

@@ -3,6 +3,7 @@ package io.github.freya022.mediathor.record.watcher
 import io.github.freya022.mediathor.record.Data
 import java.nio.file.Path
 import java.util.*
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.io.path.name
@@ -39,24 +40,23 @@ class ClipGroupImpl : ClipGroup {
             }
         }
 
-    private val _listeners: MutableList<ClipGroupListener> = arrayListOf()
-    private val listeners get() = _listeners.toList()
+    private val listeners: MutableList<ClipGroupListener> = CopyOnWriteArrayList()
 
     override fun addListener(listener: ClipGroupListener) {
-        _listeners += listener
+        this.listeners += listener
     }
 
     override suspend fun deleteClip(clip: Clip): Boolean {
         return _clips.remove(clip).also { removed ->
             if (removed) {
-                listeners.forEach { it.onClipRemoved(clip) }
+                this.listeners.forEach { it.onClipRemoved(clip) }
             }
         }
     }
 
     suspend fun addClip(clip: Clip) {
         _clips += clip
-        listeners.forEach { it.onClipAdded(clip) }
+        this.listeners.forEach { it.onClipAdded(clip) }
     }
 
     override fun equals(other: Any?): Boolean {
