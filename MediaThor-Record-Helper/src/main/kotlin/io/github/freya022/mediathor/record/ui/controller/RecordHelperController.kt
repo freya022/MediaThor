@@ -108,6 +108,5 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
                 replayBuffer.start()
             }
         }
-        updateButtons()
     }
 }
