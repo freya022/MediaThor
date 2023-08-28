@@ -21,7 +21,7 @@ abstract class ClipGroupListenerAdapter : ClipGroupListener {
 }
 
 interface ClipGroup {
-    val clips: List<Clip>
+    val clips: Set<Clip>
     val outputPath: Path
 
     fun addListener(listener: ClipGroupListener)
@@ -32,8 +32,8 @@ interface ClipGroup {
 class ClipGroupImpl : ClipGroup {
     private val id = nextId()
 
-    private val _clips: MutableList<Clip> = arrayListOf()
-    override val clips: List<Clip> get() = Collections.unmodifiableList(_clips)
+    private val _clips: MutableSet<Clip> = sortedSetOf()
+    override val clips: Set<Clip> get() = Collections.unmodifiableSet(_clips)
 
     override val outputPath: Path
         get() {

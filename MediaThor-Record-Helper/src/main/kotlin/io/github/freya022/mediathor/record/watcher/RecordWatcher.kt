@@ -113,7 +113,7 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
         val clipGroup = ClipGroupImpl()
         clipGroups += clipGroup
         clipGroup.addListener(object : ClipGroupListenerAdapter() {
-            override suspend fun onClipRemoved(clip: Clip) = cleanup(listOf(clip))
+            override suspend fun onClipRemoved(clip: Clip) = cleanup(setOf(clip))
         })
         listeners.forEach { it.onClipGroupAdded(clipGroup) }
         return clipGroup
@@ -133,7 +133,7 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
         listeners.forEach { it.onClipGroupRemoved(clipGroup) }
     }
 
-    private fun cleanup(clips: List<Clip>) {
+    private fun cleanup(clips: Set<Clip>) {
         logger.debug { "Deleting source files: ${clips.joinToString { it.path.absolutePathString() }}" }
         clips.forEach { it.path.deleteIfExists() }
         logger.info { "Deleted source files: ${clips.joinToString { it.path.absolutePathString() }}" }
