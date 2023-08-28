@@ -135,7 +135,7 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
 
     private fun cleanup(clips: List<Clip>) {
         logger.debug { "Deleting source files: ${clips.joinToString { it.path.absolutePathString() }}" }
-        clips.forEach { it.path.deleteExisting() }
+        clips.forEach { it.path.deleteIfExists() }
         logger.info { "Deleted source files: ${clips.joinToString { it.path.absolutePathString() }}" }
     }
 
