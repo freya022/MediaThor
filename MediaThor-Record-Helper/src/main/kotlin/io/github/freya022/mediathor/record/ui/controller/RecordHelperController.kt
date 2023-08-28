@@ -90,8 +90,13 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
     }
 
     @FXML
-    fun onFlushAction(event: ActionEvent) {
-
+    fun onFlushAction(event: ActionEvent) = launchMainContext {
+        flushButton.withDebounce("Merging...", flushButton, deleteButton) {
+            val selectedGroups = controllerByClipGroup.values.flatMap { it.selections }.map { it.group }.distinct()
+            selectedGroups.forEach {
+                recordWatcher.flushGroup(it)
+            }
+        }
     }
 
     @FXML
