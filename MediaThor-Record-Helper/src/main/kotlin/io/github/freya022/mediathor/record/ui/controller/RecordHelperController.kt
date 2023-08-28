@@ -13,9 +13,12 @@ import javafx.scene.control.Button
 import javafx.scene.layout.HBox
 import javafx.scene.layout.VBox
 import kotlinx.coroutines.runBlocking
+import mu.two.KotlinLogging
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import org.kordamp.ikonli.javafx.FontIcon
+
+private val logger = KotlinLogging.logger { }
 
 class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
     @FXML
@@ -47,7 +50,9 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
     }
 
     override suspend fun onClipGroupRemoved(clipGroup: ClipGroup) = withMainContext {
-        clipGroupsBox.children -= controllerByClipGroup.remove(clipGroup)
+        val controller = controllerByClipGroup.remove(clipGroup)
+            ?: return@withMainContext logger.error { "Could not find controller of clip group $clipGroup" }
+        clipGroupsBox.children -= controller
     }
 
     fun updateButtons() = runBlocking(uiScope.coroutineContext) {
@@ -75,8 +80,13 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
     }
 
     @FXML
-    fun onDeleteAction(event: ActionEvent) {
-
+    fun onDeleteAction(event: ActionEvent) = launchMainContext {
+        deleteButton.withDebounce("Deleting...", deleteButton, flushButton) {
+            val selectedClips = controllerByClipGroup.values.flatMap { it.selections }
+            selectedClips.forEach {
+                recordWatcher.removeClip(it)
+            }
+        }
     }
 
     @FXML

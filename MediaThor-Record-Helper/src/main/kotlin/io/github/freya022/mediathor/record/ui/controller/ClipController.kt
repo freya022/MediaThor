@@ -1,7 +1,6 @@
 package io.github.freya022.mediathor.record.ui.controller
 
-import io.github.freya022.mediathor.record.watcher.Clip
-import io.github.freya022.mediathor.record.watcher.ClipGroupListener
+import io.github.freya022.mediathor.record.watcher.*
 import io.github.freya022.mediathor.ui.utils.loadFxml
 import io.github.freya022.mediathor.ui.utils.toggleStyleClass
 import javafx.animation.AnimationTimer
@@ -9,6 +8,8 @@ import javafx.fxml.FXML
 import javafx.scene.control.Label
 import javafx.scene.image.ImageView
 import javafx.scene.layout.VBox
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 import java.time.Duration
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
@@ -35,7 +36,7 @@ private val timestampFormatter = DateTimeFormatterBuilder()
 class ClipController(
     private val recordHelperController: RecordHelperController,
     val clip: Clip
-) : VBox() {
+) : VBox(), KoinComponent {
     @FXML
     private lateinit var durationLabel: Label
 
@@ -44,6 +45,8 @@ class ClipController(
 
     @FXML
     private lateinit var timestampLabel: Label
+
+    private val recordWatcher: RecordWatcher = get()
 
     val isSelected: Boolean get() = selectedClass in styleClass
 
@@ -67,11 +70,21 @@ class ClipController(
         }
         timer.start()
 
+        recordWatcher.addListener(object : RecordWatcherListener {
+            override suspend fun onClipGroupAdded(clipGroup: ClipGroup) {}
+
+            override suspend fun onClipGroupRemoved(clipGroup: ClipGroup) {
+                if (this@ClipController.clip.group === clipGroup) {
+                    timer.stop()
+                }
+            }
+        })
+
         clip.group.addListener(object : ClipGroupListener {
             override suspend fun onClipAdded(clip: Clip) {}
 
             override suspend fun onClipRemoved(clip: Clip) {
-                if (this@ClipController.clip == clip) {
+                if (this@ClipController.clip === clip) {
                     timer.stop()
                 }
             }

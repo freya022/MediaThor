@@ -26,6 +26,8 @@ private val logger = KotlinLogging.logger { }
 
 interface RecordWatcher {
     fun addListener(listener: RecordWatcherListener)
+
+    suspend fun removeClip(clip: Clip)
     suspend fun removeClipGroup(clipGroup: ClipGroup)
 
     suspend fun flushGroup(clipGroup: ClipGroup)
@@ -119,6 +121,14 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
         })
         listeners.forEach { it.onClipGroupAdded(clipGroup) }
         return clipGroup
+    }
+
+    override suspend fun removeClip(clip: Clip) {
+        if (clip.group.clips.size > 1) {
+            clip.group.deleteClip(clip)
+        } else {
+            removeClipGroup(clip.group)
+        }
     }
 
     override suspend fun removeClipGroup(clipGroup: ClipGroup) {
