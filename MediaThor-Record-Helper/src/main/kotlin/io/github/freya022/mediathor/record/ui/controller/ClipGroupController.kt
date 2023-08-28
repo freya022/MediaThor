@@ -4,12 +4,14 @@ import io.github.freya022.mediathor.record.watcher.Clip
 import io.github.freya022.mediathor.record.watcher.ClipGroup
 import io.github.freya022.mediathor.record.watcher.ClipGroupListener
 import io.github.freya022.mediathor.ui.CustomTitledPane
+import io.github.freya022.mediathor.ui.useSmoothScroll
 import io.github.freya022.mediathor.ui.utils.addListListener
 import io.github.freya022.mediathor.ui.utils.launchMainContext
 import io.github.freya022.mediathor.ui.utils.loadFxml
 import io.github.freya022.mediathor.ui.utils.withMainContext
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
+import javafx.scene.control.ScrollPane
 import javafx.scene.layout.HBox
 import java.net.URL
 import java.util.*
@@ -21,7 +23,10 @@ class ClipGroupController(
     private val clipGroup: ClipGroup
 ) : CustomTitledPane(), ClipGroupListener {
     @FXML
-    private lateinit var clipBox: HBox
+    private lateinit var clipsPane: ScrollPane
+
+    @FXML
+    private lateinit var clipsBox: HBox
 
     private val controllerByClip: MutableMap<Clip, ClipController> = hashMapOf()
 
@@ -37,8 +42,10 @@ class ClipGroupController(
     override fun initialize(location: URL?, resources: ResourceBundle?) {
         super.initialize(location, resources)
 
+        clipsPane.useSmoothScroll()
+
         clipGroup.addListener(this@ClipGroupController)
-        clipBox.childrenUnmodifiable.addListListener {
+        clipsBox.childrenUnmodifiable.addListListener {
             update()
         }
     }
@@ -51,11 +58,11 @@ class ClipGroupController(
     override suspend fun onClipAdded(clip: Clip) = withMainContext {
         val clipController = ClipController(recordHelperController, clip)
         controllerByClip[clip] = clipController
-        clipBox.children += clipController
+        clipsBox.children += clipController
     }
 
     override suspend fun onClipRemoved(clip: Clip) = withMainContext {
-        clipBox.children -= controllerByClip.remove(clip)
+        clipsBox.children -= controllerByClip.remove(clip)
     }
 
     private suspend fun update() = withMainContext {

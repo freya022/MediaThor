@@ -6,9 +6,9 @@
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 <fx:root alignment="TOP_LEFT" styleClass="dense" type="TitledPane" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
    <content>
-      <ScrollPane fitToHeight="true">
+      <ScrollPane fx:id="clipsPane" fitToHeight="true">
          <content>
-            <HBox fx:id="clipBox" spacing="10.0" />
+            <HBox fx:id="clipsBox" spacing="10.0" />
          </content>
       </ScrollPane>
    </content>

@@ -7,6 +7,7 @@ import io.github.freya022.mediathor.record.watcher.Clip
 import io.github.freya022.mediathor.record.watcher.ClipGroup
 import io.github.freya022.mediathor.record.watcher.RecordWatcher
 import io.github.freya022.mediathor.record.watcher.RecordWatcherListener
+import io.github.freya022.mediathor.ui.useSmoothScroll
 import io.github.freya022.mediathor.ui.utils.launchMainContext
 import io.github.freya022.mediathor.ui.utils.loadFxml
 import io.github.freya022.mediathor.ui.utils.withDebounce
@@ -14,6 +15,7 @@ import io.github.freya022.mediathor.ui.utils.withMainContext
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
 import javafx.scene.control.Button
+import javafx.scene.control.ScrollPane
 import javafx.scene.layout.HBox
 import javafx.scene.layout.VBox
 import kotlinx.coroutines.runBlocking
@@ -25,6 +27,9 @@ import org.kordamp.ikonli.javafx.FontIcon
 private val logger = KotlinLogging.logger { }
 
 class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
+    @FXML
+    private lateinit var clipGroupsPane: ScrollPane
+
     @FXML
     private lateinit var clipGroupsBox: VBox
 
@@ -76,6 +81,8 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
 
     @FXML
     private fun initialize() {
+        clipGroupsPane.useSmoothScroll()
+
         runBlocking { updateButtons() }
         replayBuffer.obs.listener<ReplayBufferStateChangedEvent> {
             // The internal state is already updated at this point
