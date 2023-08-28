@@ -15,6 +15,11 @@ interface ClipGroupListener {
     suspend fun onClipRemoved(clip: Clip)
 }
 
+abstract class ClipGroupListenerAdapter : ClipGroupListener {
+    override suspend fun onClipAdded(clip: Clip) { }
+    override suspend fun onClipRemoved(clip: Clip) { }
+}
+
 interface ClipGroup {
     val clips: List<Clip>
     val outputPath: Path

@@ -112,12 +112,8 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
     private suspend fun createClipGroup(): ClipGroupImpl {
         val clipGroup = ClipGroupImpl()
         clipGroups += clipGroup
-        clipGroup.addListener(object : ClipGroupListener {
-            override suspend fun onClipAdded(clip: Clip) {}
-
-            override suspend fun onClipRemoved(clip: Clip) {
-                cleanup(listOf(clip))
-            }
+        clipGroup.addListener(object : ClipGroupListenerAdapter() {
+            override suspend fun onClipRemoved(clip: Clip) = cleanup(listOf(clip))
         })
         listeners.forEach { it.onClipGroupAdded(clipGroup) }
         return clipGroup

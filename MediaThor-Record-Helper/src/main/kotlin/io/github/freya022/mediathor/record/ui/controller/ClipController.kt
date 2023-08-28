@@ -70,9 +70,7 @@ class ClipController(
         }
         timer.start()
 
-        recordWatcher.addListener(object : RecordWatcherListener {
-            override suspend fun onClipGroupAdded(clipGroup: ClipGroup) {}
-
+        recordWatcher.addListener(object : RecordWatcherListenerAdapter() {
             override suspend fun onClipGroupRemoved(clipGroup: ClipGroup) {
                 if (this@ClipController.clip.group === clipGroup) {
                     timer.stop()
@@ -80,9 +78,7 @@ class ClipController(
             }
         })
 
-        clip.group.addListener(object : ClipGroupListener {
-            override suspend fun onClipAdded(clip: Clip) {}
-
+        clip.group.addListener(object : ClipGroupListenerAdapter() {
             override suspend fun onClipRemoved(clip: Clip) {
                 if (this@ClipController.clip === clip) {
                     timer.stop()

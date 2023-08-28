@@ -5,3 +5,9 @@ interface RecordWatcherListener {
 
     suspend fun onClipGroupRemoved(clipGroup: ClipGroup)
 }
+
+abstract class RecordWatcherListenerAdapter : RecordWatcherListener {
+    override suspend fun onClipGroupAdded(clipGroup: ClipGroup) { }
+
+    override suspend fun onClipGroupRemoved(clipGroup: ClipGroup) { }
+}
