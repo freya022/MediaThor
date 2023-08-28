@@ -29,8 +29,7 @@ class ClipGroupController(
     }
 
     val selections: List<Clip>
-        get() = clipBox.childrenUnmodifiable
-            .map { it as ClipController }
+        get() = controllerByClip.values
             .filter { it.isSelected }
             .map { it.clip }
 
