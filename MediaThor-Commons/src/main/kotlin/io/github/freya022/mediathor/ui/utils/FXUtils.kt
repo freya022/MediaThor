@@ -46,14 +46,14 @@ inline fun <R> withAnimationTimer(crossinline action: () -> Unit, block: () -> R
     }
 }
 
-inline fun <R> Labeled.withDebounce(text: String, disabledNode: Node = this, block: () -> R): R {
+inline fun <R> Labeled.withDebounce(text: String, vararg disabledNodes: Node = arrayOf(this), block: () -> R): R {
     val oldText = this.text
-    disabledNode.isDisable = true
+    disabledNodes.forEach { it.isDisable = true }
     this.text = text
     return try {
         block()
     } finally {
-        disabledNode.isDisable = false
+        disabledNodes.forEach { it.isDisable = false }
         this.text = oldText
     }
 }

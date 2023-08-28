@@ -161,7 +161,7 @@ class VolumeAdjusterItemController(
 
     @FXML
     fun onAdjustAction(event: ActionEvent) = launchMainContext {
-        (event.target as Button).withDebounce("Adjusting...", disabledNode = this@VolumeAdjusterItemController) {
+        (event.target as Button).withDebounce("Adjusting...", this@VolumeAdjusterItemController) {
             pause()
             mediaPlayer.invalidate()
 
