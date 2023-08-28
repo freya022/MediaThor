@@ -3,6 +3,8 @@ package io.github.freya022.mediathor.record.watcher
 import io.github.freya022.mediathor.record.Data
 import java.nio.file.Path
 import java.util.*
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlin.io.path.name
 import kotlin.io.path.nameWithoutExtension
 
@@ -22,6 +24,8 @@ interface ClipGroup {
 }
 
 class ClipGroupImpl : ClipGroup {
+    private val id = nextId()
+
     private val _clips: MutableList<Clip> = arrayListOf()
     override val clips: List<Clip> get() = Collections.unmodifiableList(_clips)
 
@@ -61,19 +65,21 @@ class ClipGroupImpl : ClipGroup {
 
         other as ClipGroupImpl
 
-        if (_clips != other._clips) return false
-        if (listeners != other.listeners) return false
-
-        return true
+        return id == other.id
     }
 
     override fun hashCode(): Int {
-        var result = _clips.hashCode()
-        result = 31 * result + listeners.hashCode()
-        return result
+        return id.hashCode()
     }
 
     override fun toString(): String {
-        return "ClipGroupImpl(clips=$_clips)"
+        return "ClipGroupImpl(id=$id, clips=$_clips)"
+    }
+
+    companion object {
+        private val lock = ReentrantLock()
+        private var currentId: Long = 0
+
+        fun nextId(): Long = lock.withLock { currentId++ }
     }
 }
