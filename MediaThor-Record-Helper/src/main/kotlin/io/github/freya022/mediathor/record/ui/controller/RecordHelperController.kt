@@ -3,6 +3,7 @@ package io.github.freya022.mediathor.record.ui.controller
 import io.github.freya022.mediathor.record.obs.ReplayBuffer
 import io.github.freya022.mediathor.record.obs.data.events.ReplayBufferStateChangedEvent
 import io.github.freya022.mediathor.record.obs.listener
+import io.github.freya022.mediathor.record.watcher.Clip
 import io.github.freya022.mediathor.record.watcher.ClipGroup
 import io.github.freya022.mediathor.record.watcher.RecordWatcher
 import io.github.freya022.mediathor.record.watcher.RecordWatcherListener
@@ -82,11 +83,17 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
         }
     }
 
+    private val selections: List<Clip>
+        get() = controllerByClipGroup.values.flatMap { it.selections }
+
     @FXML
     fun onDeleteAction(event: ActionEvent) = launchMainContext {
+        deleteClips(selections)
+    }
+
+    suspend fun deleteClips(clips: List<Clip>) = withMainContext {
         deleteButton.withDebounce("Deleting...", deleteButton, flushButton) {
-            val selectedClips = controllerByClipGroup.values.flatMap { it.selections }
-            selectedClips.forEach {
+            clips.forEach {
                 recordWatcher.removeClip(it)
             }
         }
@@ -94,9 +101,12 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
 
     @FXML
     fun onFlushAction(event: ActionEvent) = launchMainContext {
+        mergeClips(selections.map { it.group }.distinct())
+    }
+
+    suspend fun mergeClips(groups: List<ClipGroup>) = withMainContext {
         flushButton.withDebounce("Merging...", flushButton, deleteButton) {
-            val selectedGroups = controllerByClipGroup.values.flatMap { it.selections }.map { it.group }.distinct()
-            selectedGroups.forEach {
+            groups.forEach {
                 recordWatcher.flushGroup(it)
             }
         }
