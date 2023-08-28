@@ -2,6 +2,7 @@ package io.github.freya022.mediathor.record.ui.controller
 
 import io.github.freya022.mediathor.record.watcher.*
 import io.github.freya022.mediathor.ui.utils.loadFxml
+import io.github.freya022.mediathor.ui.utils.onClick
 import io.github.freya022.mediathor.ui.utils.toggleStyleClass
 import javafx.animation.AnimationTimer
 import javafx.fxml.FXML
@@ -86,7 +87,7 @@ class ClipController(
             }
         })
 
-        setOnMouseClicked {
+        onClick {
             toggleStyleClass(selectedClass)
             recordHelperController.updateButtons()
         }

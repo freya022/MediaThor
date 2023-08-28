@@ -6,7 +6,10 @@ import io.github.freya022.mediathor.record.obs.listener
 import io.github.freya022.mediathor.record.watcher.ClipGroup
 import io.github.freya022.mediathor.record.watcher.RecordWatcher
 import io.github.freya022.mediathor.record.watcher.RecordWatcherListener
-import io.github.freya022.mediathor.ui.utils.*
+import io.github.freya022.mediathor.ui.utils.launchMainContext
+import io.github.freya022.mediathor.ui.utils.loadFxml
+import io.github.freya022.mediathor.ui.utils.withDebounce
+import io.github.freya022.mediathor.ui.utils.withMainContext
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
 import javafx.scene.control.Button
@@ -55,7 +58,7 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
         clipGroupsBox.children -= controller
     }
 
-    fun updateButtons() = runBlocking(uiScope.coroutineContext) {
+    suspend fun updateButtons() = withMainContext {
         val hasSelectedClips = controllerByClipGroup.values.any { it.selections.isNotEmpty() }
         deleteButton.isDisable = !hasSelectedClips
         flushButton.isDisable = !hasSelectedClips
@@ -72,7 +75,7 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
 
     @FXML
     private fun initialize() {
-        updateButtons()
+        runBlocking { updateButtons() }
         replayBuffer.obs.listener<ReplayBufferStateChangedEvent> {
             // The internal state is already updated at this point
             updateButtons()
