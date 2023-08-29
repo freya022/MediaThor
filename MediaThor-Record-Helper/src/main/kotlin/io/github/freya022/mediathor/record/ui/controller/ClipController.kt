@@ -5,16 +5,15 @@ import io.github.freya022.mediathor.ui.utils.launchMainContext
 import io.github.freya022.mediathor.ui.utils.loadFxml
 import io.github.freya022.mediathor.ui.utils.onClick
 import io.github.freya022.mediathor.ui.utils.toggleStyleClass
-import io.github.freya022.mediathor.utils.extractThumbnail
-import io.github.freya022.mediathor.utils.toFFMpegSize
 import javafx.animation.AnimationTimer
 import javafx.fxml.FXML
 import javafx.scene.control.Label
-import javafx.scene.image.Image
 import javafx.scene.image.ImageView
 import javafx.scene.layout.VBox
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
+import uk.co.caprica.vlcj.factory.MediaPlayerFactory
+import uk.co.caprica.vlcj.javafx.videosurface.ImageViewVideoSurface
 import java.time.Duration
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
@@ -22,8 +21,6 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatterBuilder
 import java.time.temporal.ChronoField.*
 import java.util.*
-import kotlin.io.path.createTempFile
-import kotlin.io.path.inputStream
 import kotlin.time.DurationUnit
 import kotlin.time.toKotlinDuration
 
@@ -55,6 +52,9 @@ class ClipController(
 
     private val recordWatcher: RecordWatcher = get()
 
+    private val factory = MediaPlayerFactory()
+    private val embeddedMediaPlayer = factory.mediaPlayers().newEmbeddedMediaPlayer()
+
     val isSelected: Boolean get() = selectedClass in styleClass
 
     init {
@@ -78,12 +78,12 @@ class ClipController(
         timer.start()
 
         launchMainContext {
-            val thumbnailPath = createTempFile("thumbnail", suffix = ".png")
-            val exitCode = extractThumbnail(clip.path, thumbnailView.fitWidth.toFFMpegSize(), thumbnailView.fitHeight.toFFMpegSize(), thumbnailPath).exitValue()
-            if (exitCode == 0) {
-                thumbnailPath.inputStream().buffered().use { stream ->
-                    thumbnailView.image = Image(stream)
-                }
+            embeddedMediaPlayer.videoSurface().set(ImageViewVideoSurface(thumbnailView))
+
+            //TODO add global volume and play bar
+            embeddedMediaPlayer.media().startPaused(clip.path.toString())
+            thumbnailView.hoverProperty().addListener { _, _, isHover ->
+                embeddedMediaPlayer.controls().setPause(!isHover)
             }
         }
 
