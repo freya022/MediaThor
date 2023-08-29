@@ -1,10 +1,10 @@
 package io.github.freya022.mediathor.dl.ui.controller
 
-import io.github.freya022.mediathor.dl.Data
 import io.github.freya022.mediathor.dl.DownloaderListener
 import io.github.freya022.mediathor.dl.MediaThorDownloader
 import io.github.freya022.mediathor.dl.ui.model.Media
 import io.github.freya022.mediathor.ui.utils.*
+import io.github.freya022.mediathor.utils.extractThumbnail
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
 import javafx.scene.control.Button
@@ -15,7 +15,9 @@ import javafx.scene.image.ImageView
 import javafx.scene.input.Clipboard
 import javafx.scene.input.DataFormat
 import javafx.scene.layout.StackPane
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import mu.two.KotlinLogging
@@ -60,14 +62,11 @@ class DownloadItemController(
         if (media.mediaPlaylist.mediaSegments().indexOfFirst { s -> s.uri() == url } == 0) {
             //Do not let the code resume on the download thread
             withMainContext {
+                logger.trace { "Getting thumbnail of ${path.absolutePathString()}" }
                 val outputPath = path.toAbsolutePath().resolveSibling("${path.nameWithoutExtension}.png")
-                val exitCode = withContext(Dispatchers.IO) {
-                    extractThumbnail(path, outputPath)
-                }
+                val exitCode = extractThumbnail(path, previewImage.fitWidth.toInt(), previewImage.fitHeight.toInt(), outputPath).exitValue()
 
-                if (exitCode != 0) {
-                    logger.error("FFmpeg exited with code: $exitCode")
-                } else {
+                if (exitCode == 0) {
                     outputPath.inputStream().buffered().use { stream ->
                         previewImage.image = Image(stream)
                     }
@@ -104,24 +103,6 @@ class DownloadItemController(
         logger.error("Failed to initialize download item with master url '$masterUrl', at '${path.absolutePathString()}'", it)
         onUpdate(fail = true)
     }
-
-    // "ffmpeg -ss [seconds] -i [source] -frames:v 1 -s [Width]x[Height] -update true output.png"
-    private fun extractThumbnail(path: Path, outputPath: Path) = ProcessBuilder()
-        .directory(Data.tempDirectory.toFile())
-        .command(
-            "ffmpeg", "-y",
-            "-ss", "1",
-            "-i", path.absolutePathString(),
-            "-frames:v", "1",
-            "-s", "${previewImage.fitWidth.toInt()}x${previewImage.fitHeight.toInt()}",
-            "-update", "true",
-            outputPath.toString()
-        )
-        .redirectOutput(ProcessBuilder.Redirect.DISCARD) //TODO write to internal buffer and output if error code != 0
-        .redirectError(ProcessBuilder.Redirect.DISCARD)
-        .also { logger.trace { "Getting thumbnail with ${it.command().joinToString(" ")}" } }
-        .start()
-        .waitFor()
 
     @FXML
     private fun initialize() {

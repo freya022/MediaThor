@@ -22,6 +22,7 @@ private val ROOT_PATH = Path.of("\\").normalize()
 
 private val logger = KotlinLogging.logger { }
 
+//TODO try to improve safety as to avoid deadlocking the process inside a system call
 @OptIn(ExperimentalStdlibApi::class)
 class WinFspMemFS(
     private var volumeLabel: String,

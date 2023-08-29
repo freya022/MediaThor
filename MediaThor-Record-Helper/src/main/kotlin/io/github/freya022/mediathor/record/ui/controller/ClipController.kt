@@ -1,12 +1,16 @@
 package io.github.freya022.mediathor.record.ui.controller
 
 import io.github.freya022.mediathor.record.watcher.*
+import io.github.freya022.mediathor.ui.utils.launchMainContext
 import io.github.freya022.mediathor.ui.utils.loadFxml
 import io.github.freya022.mediathor.ui.utils.onClick
 import io.github.freya022.mediathor.ui.utils.toggleStyleClass
+import io.github.freya022.mediathor.utils.extractThumbnail
+import io.github.freya022.mediathor.utils.toFFMpegSize
 import javafx.animation.AnimationTimer
 import javafx.fxml.FXML
 import javafx.scene.control.Label
+import javafx.scene.image.Image
 import javafx.scene.image.ImageView
 import javafx.scene.layout.VBox
 import org.koin.core.component.KoinComponent
@@ -18,6 +22,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatterBuilder
 import java.time.temporal.ChronoField.*
 import java.util.*
+import kotlin.io.path.createTempFile
+import kotlin.io.path.inputStream
 import kotlin.time.DurationUnit
 import kotlin.time.toKotlinDuration
 
@@ -70,6 +76,16 @@ class ClipController(
             }
         }
         timer.start()
+
+        launchMainContext {
+            val thumbnailPath = createTempFile("thumbnail", suffix = ".png")
+            val exitCode = extractThumbnail(clip.path, thumbnailView.fitWidth.toFFMpegSize(), thumbnailView.fitHeight.toFFMpegSize(), thumbnailPath).exitValue()
+            if (exitCode == 0) {
+                thumbnailPath.inputStream().buffered().use { stream ->
+                    thumbnailView.image = Image(stream)
+                }
+            }
+        }
 
         recordWatcher.addListener(object : RecordWatcherListenerAdapter() {
             override suspend fun onClipGroupRemoved(clipGroup: ClipGroup) {
