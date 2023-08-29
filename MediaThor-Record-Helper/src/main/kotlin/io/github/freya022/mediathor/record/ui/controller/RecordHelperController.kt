@@ -7,7 +7,6 @@ import io.github.freya022.mediathor.record.watcher.Clip
 import io.github.freya022.mediathor.record.watcher.ClipGroup
 import io.github.freya022.mediathor.record.watcher.RecordWatcher
 import io.github.freya022.mediathor.record.watcher.RecordWatcherListener
-import io.github.freya022.mediathor.ui.useSmoothScroll
 import io.github.freya022.mediathor.ui.utils.launchMainContext
 import io.github.freya022.mediathor.ui.utils.loadFxml
 import io.github.freya022.mediathor.ui.utils.withDebounce
@@ -81,8 +80,6 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
 
     @FXML
     private fun initialize() {
-        clipGroupsPane.useSmoothScroll()
-
         runBlocking { updateButtons() }
         replayBuffer.obs.listener<ReplayBufferStateChangedEvent> {
             // The internal state is already updated at this point

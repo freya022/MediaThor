@@ -4,7 +4,6 @@ import io.github.freya022.mediathor.record.watcher.Clip
 import io.github.freya022.mediathor.record.watcher.ClipGroup
 import io.github.freya022.mediathor.record.watcher.ClipGroupListener
 import io.github.freya022.mediathor.ui.CustomTitledPane
-import io.github.freya022.mediathor.ui.useSmoothScroll
 import io.github.freya022.mediathor.ui.utils.addListListener
 import io.github.freya022.mediathor.ui.utils.launchMainContext
 import io.github.freya022.mediathor.ui.utils.loadFxml
@@ -42,8 +41,6 @@ class ClipGroupController(
     override fun initialize(location: URL?, resources: ResourceBundle?) {
         super.initialize(location, resources)
 
-        clipsPane.useSmoothScroll()
-
         clipGroup.addListener(this@ClipGroupController)
         clipsBox.childrenUnmodifiable.addListListener {
             update()
@@ -52,6 +49,7 @@ class ClipGroupController(
 
     @FXML
     fun onMergeAction(event: ActionEvent) = launchMainContext {
+        //TODO debounce merge button
         recordHelperController.mergeClips(listOf(clipGroup))
     }
 
