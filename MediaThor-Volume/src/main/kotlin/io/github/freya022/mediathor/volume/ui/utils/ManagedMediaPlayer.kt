@@ -9,14 +9,13 @@ import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventListener
-import uk.co.caprica.vlcj.player.embedded.EmbeddedMediaPlayer
 
 private val logger = KotlinLogging.logger { }
 
 class ManagedMediaPlayer(volume: Int) {
     private val mutex = Mutex()
     private val mediaPlayerFactory: MediaPlayerFactory = MediaPlayerFactory()
-    private val mediaPlayer: EmbeddedMediaPlayer = mediaPlayerFactory.mediaPlayers().newEmbeddedMediaPlayer()
+    private val mediaPlayer: MediaPlayer = mediaPlayerFactory.mediaPlayers().newMediaPlayer()
 
     private var mediaPlayerEventListener: MediaPlayerEventListener? = null
     private var currentMedia: String? = null

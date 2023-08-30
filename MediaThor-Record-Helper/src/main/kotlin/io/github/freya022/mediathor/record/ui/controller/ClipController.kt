@@ -1,5 +1,6 @@
 package io.github.freya022.mediathor.record.ui.controller
 
+import io.github.freya022.mediathor.record.App
 import io.github.freya022.mediathor.record.watcher.*
 import io.github.freya022.mediathor.ui.utils.launchMainContext
 import io.github.freya022.mediathor.ui.utils.loadFxml
@@ -12,7 +13,6 @@ import javafx.scene.image.ImageView
 import javafx.scene.layout.VBox
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
-import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.javafx.videosurface.ImageViewVideoSurface
 import java.time.Duration
 import java.time.ZoneOffset
@@ -52,8 +52,7 @@ class ClipController(
 
     private val recordWatcher: RecordWatcher = get()
 
-    private val factory = MediaPlayerFactory()
-    private val embeddedMediaPlayer = factory.mediaPlayers().newEmbeddedMediaPlayer()
+    private val embeddedMediaPlayer = App.newMediaPlayer()
 
     val isSelected: Boolean get() = selectedClass in styleClass
 
