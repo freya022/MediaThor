@@ -2,18 +2,22 @@ package io.github.freya022.mediathor.record.ui.controller
 
 import io.github.freya022.mediathor.record.App
 import io.github.freya022.mediathor.record.watcher.*
-import io.github.freya022.mediathor.ui.utils.launchMainContext
 import io.github.freya022.mediathor.ui.utils.loadFxml
 import io.github.freya022.mediathor.ui.utils.onClick
 import io.github.freya022.mediathor.ui.utils.toggleStyleClass
+import io.github.freya022.mediathor.utils.launchVlcContext
 import javafx.animation.AnimationTimer
 import javafx.fxml.FXML
 import javafx.scene.control.Label
+import javafx.scene.control.ProgressBar
 import javafx.scene.image.ImageView
+import javafx.scene.layout.StackPane
 import javafx.scene.layout.VBox
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import uk.co.caprica.vlcj.javafx.videosurface.ImageViewVideoSurface
+import uk.co.caprica.vlcj.player.base.MediaPlayer
+import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import java.time.Duration
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
@@ -45,7 +49,13 @@ class ClipController(
     private lateinit var durationLabel: Label
 
     @FXML
+    private lateinit var contentPane: StackPane
+
+    @FXML
     private lateinit var thumbnailView: ImageView
+
+    @FXML
+    private lateinit var progressBar: ProgressBar
 
     @FXML
     private lateinit var timestampLabel: Label
@@ -53,6 +63,7 @@ class ClipController(
     private val recordWatcher: RecordWatcher = get()
 
     private val embeddedMediaPlayer = App.newMediaPlayer()
+    private var mediaLength: Long = 0
 
     val isSelected: Boolean get() = selectedClass in styleClass
 
@@ -76,16 +87,40 @@ class ClipController(
         }
         timer.start()
 
-        launchMainContext {
+        launchVlcContext {
             embeddedMediaPlayer.videoSurface().set(ImageViewVideoSurface(thumbnailView))
+            embeddedMediaPlayer.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
+                override fun lengthChanged(mediaPlayer: MediaPlayer, newLength: Long) {
+                    mediaLength = newLength
+                }
 
-            //TODO add global volume and play bar
+                override fun timeChanged(mediaPlayer: MediaPlayer, newTime: Long) {
+                    progressBar.progress = newTime.toDouble() / mediaLength.toDouble()
+                }
+
+                override fun finished(mediaPlayer: MediaPlayer) {
+                    launchVlcContext {
+                        mediaPlayer.controls().setTime(0)
+                    }
+                }
+            })
+
+            progressBar.onClick {
+                launchVlcContext {
+                    embeddedMediaPlayer.controls().setPosition((it.x / progressBar.width).toFloat())
+                }
+            }
+
+            //TODO add global volume
             embeddedMediaPlayer.media().startPaused(clip.path.toString())
-            thumbnailView.hoverProperty().addListener { _, _, isHover ->
-                embeddedMediaPlayer.controls().setPause(!isHover)
+            contentPane.hoverProperty().addListener { _, _, isHover ->
+                launchVlcContext {
+                    embeddedMediaPlayer.controls().setPause(!isHover)
+                }
             }
         }
 
+        //TODO add VLC cleanup
         recordWatcher.addListener(object : RecordWatcherListenerAdapter() {
             override suspend fun onClipGroupRemoved(clipGroup: ClipGroup) {
                 if (this@ClipController.clip.group === clipGroup) {

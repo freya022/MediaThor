@@ -2,12 +2,22 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.Cursor?>
 <?import javafx.scene.image.ImageView?>
-<?import javafx.scene.layout.Pane?>
-<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.*?>
 <fx:root alignment="TOP_CENTER" spacing="3.0" type="VBox" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
    <children>
-      <ImageView fx:id="thumbnailView" fitHeight="144.0" pickOnBounds="true" preserveRatio="true" />
+      <StackPane fx:id="contentPane">
+         <children>
+            <ImageView fx:id="thumbnailView" fitHeight="144.0" pickOnBounds="true" preserveRatio="true" />
+            <ProgressBar fx:id="progressBar" maxWidth="1.7976931348623157E308" progress="0.0" styleClass="small" StackPane.alignment="BOTTOM_LEFT">
+               <cursor>
+                  <Cursor fx:constant="HAND" />
+               </cursor>
+            </ProgressBar>
+         </children>
+      </StackPane>
       <Pane prefHeight="10.0" />
       <Label fx:id="timestampLabel" text="2023-08-21 19:12:29 - 12 minutes ago" />
       <Label fx:id="durationLabel" text="2m" />
