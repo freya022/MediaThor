@@ -4,12 +4,10 @@ import io.github.freya022.mediathor.record.watcher.Clip
 import io.github.freya022.mediathor.record.watcher.ClipGroup
 import io.github.freya022.mediathor.record.watcher.ClipGroupListener
 import io.github.freya022.mediathor.ui.CustomTitledPane
-import io.github.freya022.mediathor.ui.utils.addListListener
-import io.github.freya022.mediathor.ui.utils.launchMainContext
-import io.github.freya022.mediathor.ui.utils.loadFxml
-import io.github.freya022.mediathor.ui.utils.withMainContext
+import io.github.freya022.mediathor.ui.utils.*
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
+import javafx.scene.control.Button
 import javafx.scene.control.ScrollPane
 import javafx.scene.layout.HBox
 import java.net.URL
@@ -26,6 +24,9 @@ class ClipGroupController(
 
     @FXML
     private lateinit var clipsBox: HBox
+
+    @FXML
+    private lateinit var mergeButton: Button
 
     private val controllerByClip: MutableMap<Clip, ClipController> = hashMapOf()
 
@@ -49,8 +50,9 @@ class ClipGroupController(
 
     @FXML
     fun onMergeAction(event: ActionEvent) = launchMainContext {
-        //TODO debounce merge button
-        recordHelperController.mergeClips(listOf(clipGroup))
+        mergeButton.withDebounce("Merging...") {
+            recordHelperController.mergeClips(listOf(clipGroup))
+        }
     }
 
     override suspend fun onClipAdded(clip: Clip) = withMainContext {
