@@ -1,6 +1,6 @@
 package io.github.freya022.mediathor.record.ui.controller
 
-import io.github.freya022.mediathor.record.App
+import io.github.freya022.mediathor.record.ui.SharedEmbeddedMediaPlayer
 import io.github.freya022.mediathor.record.watcher.*
 import io.github.freya022.mediathor.ui.utils.loadFxml
 import io.github.freya022.mediathor.ui.utils.onClick
@@ -15,7 +15,6 @@ import javafx.scene.layout.StackPane
 import javafx.scene.layout.VBox
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
-import uk.co.caprica.vlcj.javafx.videosurface.ImageViewVideoSurface
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import java.time.Duration
@@ -25,6 +24,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatterBuilder
 import java.time.temporal.ChronoField.*
 import java.util.*
+import kotlin.io.path.absolutePathString
 import kotlin.time.DurationUnit
 import kotlin.time.toKotlinDuration
 
@@ -41,6 +41,8 @@ private val timestampFormatter = DateTimeFormatterBuilder()
     .appendValue(SECOND_OF_MINUTE, 2)
     .toFormatter(Locale.getDefault());
 
+private val player = SharedEmbeddedMediaPlayer()
+
 class ClipController(
     private val recordHelperController: RecordHelperController,
     val clip: Clip
@@ -52,7 +54,7 @@ class ClipController(
     private lateinit var contentPane: StackPane
 
     @FXML
-    private lateinit var thumbnailView: ImageView
+    private lateinit var clipView: ImageView
 
     @FXML
     private lateinit var progressBar: ProgressBar
@@ -62,7 +64,6 @@ class ClipController(
 
     private val recordWatcher: RecordWatcher = get()
 
-    private val embeddedMediaPlayer = App.newMediaPlayer()
     private var mediaLength: Long = 0
 
     val isSelected: Boolean get() = selectedClass in styleClass
@@ -88,8 +89,7 @@ class ClipController(
         timer.start()
 
         launchVlcContext {
-            embeddedMediaPlayer.videoSurface().set(ImageViewVideoSurface(thumbnailView))
-            embeddedMediaPlayer.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
+            val listener = object : MediaPlayerEventAdapter() {
                 override fun lengthChanged(mediaPlayer: MediaPlayer, newLength: Long) {
                     mediaLength = newLength
                 }
@@ -103,19 +103,20 @@ class ClipController(
                         mediaPlayer.controls().setTime(0)
                     }
                 }
-            })
+            }
+
+            player.initialFrame(clip.path.absolutePathString(), clipView)
 
             progressBar.onClick {
                 launchVlcContext {
-                    embeddedMediaPlayer.controls().setPosition((it.x / progressBar.width).toFloat())
+                    player.setPosition((it.x / progressBar.width).toFloat())
                 }
             }
 
             //TODO add global volume
-            embeddedMediaPlayer.media().startPaused(clip.path.toString())
             contentPane.hoverProperty().addListener { _, _, isHover ->
                 launchVlcContext {
-                    embeddedMediaPlayer.controls().setPause(!isHover)
+                    player.play(clip.path.absolutePathString(), clipView, listener, pause = !isHover)
                 }
             }
         }
@@ -124,7 +125,6 @@ class ClipController(
             override suspend fun onClipGroupRemoved(clipGroup: ClipGroup) {
                 if (this@ClipController.clip.group === clipGroup) {
                     timer.stop()
-                    App.destroyMediaPlayer(embeddedMediaPlayer)
                 }
             }
         })
@@ -133,7 +133,6 @@ class ClipController(
             override suspend fun onClipRemoved(clip: Clip) {
                 if (this@ClipController.clip === clip) {
                     timer.stop()
-                    App.destroyMediaPlayer(embeddedMediaPlayer)
                 }
             }
         })

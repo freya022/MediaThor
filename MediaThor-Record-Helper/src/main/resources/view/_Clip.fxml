@@ -10,7 +10,7 @@
    <children>
       <StackPane fx:id="contentPane">
          <children>
-            <ImageView fx:id="thumbnailView" fitHeight="144.0" pickOnBounds="true" preserveRatio="true" />
+            <ImageView fx:id="clipView" fitHeight="192.0" pickOnBounds="true" preserveRatio="true" />
             <ProgressBar fx:id="progressBar" maxWidth="1.7976931348623157E308" progress="0.0" styleClass="small" StackPane.alignment="BOTTOM_LEFT">
                <cursor>
                   <Cursor fx:constant="HAND" />
