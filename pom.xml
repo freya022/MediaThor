@@ -205,6 +205,16 @@
                 <artifactId>koin-logger-slf4j</artifactId>
                 <version>${koin.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.github.jnr</groupId>
+                <artifactId>jnr-ffi</artifactId>
+                <version>2.2.14</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.jnr-winfsp-team</groupId>
+                <artifactId>jnr-winfsp</artifactId>
+                <version>c7be8901e8</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
