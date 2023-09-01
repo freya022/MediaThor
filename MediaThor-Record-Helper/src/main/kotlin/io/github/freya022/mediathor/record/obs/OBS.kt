@@ -3,6 +3,7 @@ package io.github.freya022.mediathor.record.obs
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
+import io.github.freya022.mediathor.record.Data
 import io.github.freya022.mediathor.record.obs.data.OpCode
 import io.github.freya022.mediathor.record.obs.data.connect.Hello
 import io.github.freya022.mediathor.record.obs.data.connect.IdentifyData
@@ -10,6 +11,7 @@ import io.github.freya022.mediathor.record.obs.data.events.Event
 import io.github.freya022.mediathor.record.obs.data.events.ReplayBufferStateChangedEvent
 import io.github.freya022.mediathor.record.obs.data.receiveGateway
 import io.github.freya022.mediathor.record.obs.data.requests.*
+import io.github.freya022.mediathor.utils.directory
 import io.github.freya022.mediathor.utils.getDefaultScope
 import io.github.freya022.mediathor.utils.newExecutor
 import io.ktor.client.*
@@ -25,11 +27,17 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.channels.trySendBlocking
 import mu.two.KotlinLogging
+import java.net.BindException
+import java.net.InetSocketAddress
+import java.net.ServerSocket
 import java.security.MessageDigest
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
+import kotlin.io.path.absolutePathString
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger { }
 
@@ -60,6 +68,22 @@ class OBS(private val host: String, private val port: Int, private val password:
 
     init {
         runBlocking(Dispatchers.IO) {
+            val isObsStarted: Boolean = isObsStarted(port)
+            if (!isObsStarted) {
+                logger.debug { "Starting OBS" }
+                ProcessBuilder()
+                    .directory(Data.obsFolder)
+                    .command(Data.obsFolder.resolve("obs64.exe").absolutePathString(), "--minimize-to-tray", "--disable-updater")
+                    .start()
+
+                delay(2.seconds)
+
+                while (!isObsStarted(port)) {
+                    delay(100.milliseconds)
+                }
+                logger.info { "Started OBS" }
+            }
+
             start()
         }
     }
@@ -206,4 +230,16 @@ class OBS(private val host: String, private val port: Int, private val password:
             return@suspendCancellableCoroutine it.resumeWithException(exception)
         }
     } as R
+
+    companion object {
+        private fun isObsStarted(port: Int): Boolean = try {
+            ServerSocket().use {
+                it.reuseAddress = false
+                it.bind(InetSocketAddress(port), 1)
+            }
+            false
+        } catch (e: BindException) {
+            true
+        }
+    }
 }
