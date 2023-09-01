@@ -44,5 +44,11 @@ class App : Application(), KoinComponent {
 
             return mediaPlayer
         }
+
+        fun destroyMediaPlayer(mediaPlayer: MediaPlayer) {
+            mediaPlayers -= mediaPlayer
+            mediaPlayer.controls().stop()
+            mediaPlayer.release()
+        }
     }
 }

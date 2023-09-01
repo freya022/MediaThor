@@ -120,11 +120,11 @@ class ClipController(
             }
         }
 
-        //TODO add VLC cleanup
         recordWatcher.addListener(object : RecordWatcherListenerAdapter() {
             override suspend fun onClipGroupRemoved(clipGroup: ClipGroup) {
                 if (this@ClipController.clip.group === clipGroup) {
                     timer.stop()
+                    App.destroyMediaPlayer(embeddedMediaPlayer)
                 }
             }
         })
@@ -133,6 +133,7 @@ class ClipController(
             override suspend fun onClipRemoved(clip: Clip) {
                 if (this@ClipController.clip === clip) {
                     timer.stop()
+                    App.destroyMediaPlayer(embeddedMediaPlayer)
                 }
             }
         })
