@@ -130,20 +130,6 @@ class OBS(private val host: String, private val port: Int, private val password:
         }
     }
 
-    private fun createAuthenticationString(authentication: Hello.Authentication, password: String): String {
-        val sha256 = MessageDigest.getInstance("SHA256")
-
-        val pwdSalt = password + authentication.salt
-        val b64Secret = sha256
-            .digest(pwdSalt.encodeToByteArray())
-            .encodeBase64()
-
-        val b64SecretChallenge = b64Secret + authentication.challenge
-        return sha256
-            .digest(b64SecretChallenge.encodeToByteArray())
-            .encodeBase64()
-    }
-
     context(CoroutineScope)
     private suspend fun DefaultClientWebSocketSession.runOutputLoop() {
         while (true) {
@@ -240,6 +226,20 @@ class OBS(private val host: String, private val port: Int, private val password:
             false
         } catch (e: BindException) {
             true
+        }
+
+        private fun createAuthenticationString(authentication: Hello.Authentication, password: String): String {
+            val sha256 = MessageDigest.getInstance("SHA256")
+
+            val pwdSalt = password + authentication.salt
+            val b64Secret = sha256
+                .digest(pwdSalt.encodeToByteArray())
+                .encodeBase64()
+
+            val b64SecretChallenge = b64Secret + authentication.challenge
+            return sha256
+                .digest(b64SecretChallenge.encodeToByteArray())
+                .encodeBase64()
         }
     }
 }
