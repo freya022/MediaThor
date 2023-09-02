@@ -10,7 +10,7 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import org.koin.logger.slf4jLogger
 
-object Main {
+object RecordWatcherMain {
     val appModule = module {
         single(createdAtStart = true) {
             MemoryFileSystem('O')
