@@ -39,10 +39,6 @@
             <version>1.0</version>
         </dependency>
         <dependency>
-            <groupId>com.github.jnr</groupId>
-            <artifactId>jnr-ffi</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.github.jnr-winfsp-team</groupId>
             <artifactId>jnr-winfsp</artifactId>
         </dependency>
