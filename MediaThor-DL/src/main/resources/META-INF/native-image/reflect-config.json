@@ -166,6 +166,10 @@
   "unsafeAllocated":true
 },
 {
+  "name":"io.github.freya022.mediathor.dl.ui.App",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
   "name":"io.github.freya022.mediathor.dl.ui.controller.DownloadController",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
@@ -494,10 +498,6 @@
 },
 {
   "name":"kotlinx.coroutines.javafx.JavaFxDispatcherFactory",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"sun.java2d.marlin.DMarlinRenderingEngine",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
