@@ -4,7 +4,6 @@ import io.github.freya022.mediathor.record.obs.OBS
 import io.github.freya022.mediathor.record.watcher.RecordWatcher
 import io.github.freya022.mediathor.record.watcher.RecordWatcherImpl
 import javafx.application.Application
-import kotlinx.coroutines.runBlocking
 import org.koin.core.context.startKoin
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
@@ -24,7 +23,7 @@ object RecordWatcherMain {
     }
 
     @JvmStatic
-    fun main(args: Array<String>): Unit = runBlocking {
+    fun main(args: Array<String>) {
         startKoin {
             slf4jLogger()
 
