@@ -18,7 +18,7 @@ object RecordWatcherMain {
         singleOf(MemoryFileSystem::memFS)
         single<RecordWatcher>(createdAtStart = true) { RecordWatcherImpl() }
         single(createdAtStart = true) {
-            OBS("127.0.0.1", 4455, Config.config.obsPassword)
+            OBS("127.0.0.1", Config.config.obsPort, Config.config.obsPassword)
         }
         singleOf(OBS::replayBuffer)
     }
