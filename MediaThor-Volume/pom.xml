@@ -12,6 +12,24 @@
     <artifactId>mediathor-volume</artifactId>
     <name>MediaThor-Volume</name>
 
+    <properties>
+        <mainClass>io.github.freya022.mediathor.volume.ui.VolumeAdjusterMain</mainClass>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>${mainClass}</mainClass>
+                </configuration>
+            </plugin>
+            <!-- TODO Try to make a native app, may not work due to JNR-FFI -->
+        </plugins>
+    </build>
+
     <dependencies>
         <dependency>
             <groupId>io.github.freya022</groupId>
