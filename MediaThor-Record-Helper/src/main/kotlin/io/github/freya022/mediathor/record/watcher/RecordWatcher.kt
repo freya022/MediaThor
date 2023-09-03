@@ -1,4 +1,4 @@
-package io.github.freya022.mediathor.record
+package io.github.freya022.mediathor.record.watcher
 
 import io.github.freya022.mediathor.record.memfs.FileObj
 import io.github.freya022.mediathor.record.memfs.MemFSListener
@@ -6,22 +6,34 @@ import io.github.freya022.mediathor.record.memfs.WinFspMemFS
 import io.github.freya022.mediathor.utils.*
 import kotlinx.coroutines.*
 import mu.two.KotlinLogging
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 import java.io.ByteArrayOutputStream
-import java.io.IOException
 import java.math.BigDecimal
 import java.nio.file.Path
-import kotlin.concurrent.thread
+import java.nio.file.attribute.FileTime
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.io.path.*
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 private typealias ClipPath = Path
-private typealias KeyframeIndex = Int
+private typealias KeyframeFolder = Path
 private typealias KeyframeTimestamp = String
-private typealias KeyframeHash = String
 
 private val logger = KotlinLogging.logger { }
 
-class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
-    private class Clip(val path: Path, val keyframeIndexByHash: Map<KeyframeHash, KeyframeIndex>)
+interface RecordWatcher {
+    fun addListener(listener: RecordWatcherListener)
+
+    suspend fun removeClip(clip: Clip)
+    suspend fun removeClipGroup(clipGroup: ClipGroup)
+
+    suspend fun flushGroup(clipGroup: ClipGroup)
+}
+
+class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
     private class InputClip(val clip: Clip, val keyframeTimestamps: List<KeyframeTimestamp>, val audioStreams: Int) {
         val path: Path get() = clip.path
 
@@ -29,37 +41,20 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         var endTimestamp: String? = null
     }
 
+    private val memFS: WinFspMemFS = get()
+
     private val scope = getDefaultScope(newExecutor(1, daemon = true) { threadNumber -> name = "RecordWatcher thread #$threadNumber" }.asCoroutineDispatcher())
-    private val clips: MutableList<Clip> = arrayListOf()
+    private val clipGroups: MutableList<ClipGroup> = arrayListOf()
+    private val listeners: MutableList<RecordWatcherListener> = CopyOnWriteArrayList()
 
     private val newVideoSequencer = Sequencer(scope)
 
     init {
         memFS.addListener(this)
+    }
 
-        thread(name = "RecordWatcher Command thread", isDaemon = true) {
-            while (true) {
-                try {
-                    val input = readlnOrNull() ?: break
-
-                    if (input.contentEquals("flush", ignoreCase = true)) {
-                        scope.launch {
-                            newVideoSequencer.runTask {
-                                val previousVideos = clips.toList()
-                                clips.clear()
-
-                                flushVideos(previousVideos)
-                            }
-                        }
-                    } else {
-                        System.err.println("Unknown command '$input'")
-                    }
-                } catch (e: Exception) {
-                    logger.catching(e)
-                }
-            }
-            logger.debug { "Exited Command thread" }
-        }
+    override fun addListener(listener: RecordWatcherListener) {
+        listeners += listener
     }
 
     override fun onNewFileClosed(fileObj: FileObj) {
@@ -70,7 +65,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
                     return@launch
 
                 newVideoSequencer.runTask {
-                    onNewVideo(fileObj, newFile)
+                    onNewVideo(newFile)
                 }
             } catch (e: Exception) {
                 logger.catching(e)
@@ -102,48 +97,105 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
      *               VLC works fine though.
      */
     context(CoroutineScope)
-    private suspend fun onNewVideo(fileObj: FileObj, newFile: Path) {
-        val keyframesFolder = extractKeyframes(newFile)
+    private suspend fun onNewVideo(clipPath: ClipPath) {
+        val keyframeIndexByHash = hashKeyframes(clipPath)
+        val createdAt = (clipPath.getAttribute("creationTime") as FileTime).toInstant()
+        val duration = getClipDuration(clipPath)
 
-        val keyframeIndexByHash = hashKeyframes(newFile, keyframesFolder)
+        val clipGroup = findClipGroup(keyframeIndexByHash) ?: createClipGroup()
 
-        val currentClip = Clip(newFile, keyframeIndexByHash)
-        clips += currentClip
-
-        checkMismatchedKeyframe(currentClip) { onMismatchedKeyframe() }
+        val currentClip = Clip(clipPath, clipGroup, createdAt, duration, keyframeIndexByHash)
+        clipGroup.addClip(currentClip)
     }
 
-    private suspend fun onMismatchedKeyframe() = withContext(Dispatchers.IO) {
-        val previousVideos = clips.dropLast(1)
-        clips.removeIf { it != clips.last() }
-
-        flushVideos(previousVideos)
+    private suspend fun createClipGroup(): ClipGroupImpl {
+        val clipGroup = ClipGroupImpl()
+        clipGroups += clipGroup
+        clipGroup.addListener(object : ClipGroupListenerAdapter() {
+            override suspend fun onClipRemoved(clip: Clip) = cleanup(setOf(clip))
+        })
+        listeners.forEach { it.onClipGroupAdded(clipGroup) }
+        return clipGroup
     }
 
-    @OptIn(ExperimentalPathApi::class)
-    private suspend fun flushVideos(previousVideos: List<Clip>) = withContext(Dispatchers.IO) {
-        val copyPath = Data.videosFolder.resolve(previousVideos.last().path.name)
+    override suspend fun removeClip(clip: Clip) {
+        if (clip.group.clips.size > 1) {
+            clip.group.deleteClip(clip)
+        } else {
+            removeClipGroup(clip.group)
+        }
+    }
+
+    override suspend fun removeClipGroup(clipGroup: ClipGroup) {
+        clipGroups -= clipGroup
+        cleanup(clipGroup.clips)
+        listeners.forEach { it.onClipGroupRemoved(clipGroup) }
+    }
+
+    private fun cleanup(clips: Set<Clip>) {
+        logger.debug { "Deleting source files: ${clips.joinToString { it.path.absolutePathString() }}" }
+        clips.forEach { it.path.deleteIfExists() }
+        logger.info { "Deleted source files: ${clips.joinToString { it.path.absolutePathString() }}" }
+    }
+
+    private fun findClipGroup(keyframeIndexByHash: Map<KeyframeHash, KeyframeIndex>): ClipGroupImpl? {
+        // Find a group where a clip's keyframes match one of ours
+        return clipGroups
+            .find { group ->
+                group.clips.any { it.sharesKeyframe(keyframeIndexByHash) }
+            } as? ClipGroupImpl
+    }
+
+    private suspend fun getClipDuration(path: ClipPath): Duration = withContext(Dispatchers.IO) {
+        try {
+            val outputStream = ByteArrayOutputStream()
+            val errorStream = ByteArrayOutputStream()
+            ProcessBuilder()
+                .directory(memFS.mountPointPath)
+                .command(
+                    "ffprobe",
+                    "-v", "warning",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    path.absolutePathString())
+                .start()
+                .redirectOutputs(outputStream, errorStream)
+                .waitFor(logger, outputStream, errorStream)
+
+            val durationSeconds = outputStream.toByteArray().decodeToString().trim().toBigDecimal()
+            val durationMilliseconds = (durationSeconds * 1000.toBigDecimal()).longValueExact()
+            durationMilliseconds.toDuration(DurationUnit.MILLISECONDS)
+        } catch (e: Exception) {
+            logger.catching(e)
+            Duration.ZERO
+        }
+    }
+
+    override suspend fun flushGroup(clipGroup: ClipGroup) = withContext(Dispatchers.IO) {
+        val clips = clipGroup.clips
+
+        val outputPath = clipGroup.outputPath
 
         // If there is only one previous clip, copy to disk
-        if (previousVideos.size == 1) {
-            val previousVideoPath = previousVideos.single().path
-            logger.debug { "Moving $previousVideoPath into $copyPath" }
+        if (clips.size == 1) {
+            val previousVideoPath = clips.single().path
+            logger.debug { "Moving $previousVideoPath into $outputPath" }
 
             // Copy
-            previousVideoPath.moveTo(copyPath)
-            // Delete keyframes
-            getKeyframeFolder(previousVideoPath).deleteRecursively()
+            previousVideoPath.moveTo(outputPath)
 
-            logger.info { "Moved $previousVideoPath into $copyPath" }
+            logger.info { "Moved $previousVideoPath into $outputPath" }
+
+            // Delete group and cleanup
+            removeClipGroup(clipGroup)
+
             return@withContext
         }
 
         // Merge previous videos to disk
-        logger.debug { "Merging ${previousVideos.joinToString { it.path.name }}" }
+        logger.debug { "Merging ${clips.joinToString { it.path.name }}" }
 
-        val mergePath = copyPath.resolveSibling(copyPath.nameWithoutExtension + ".mp4")
-
-        val inputs = previousVideos.map {
+        val inputs = clips.map {
             val timestamps = getKeyframeTimestamps(it.path)
             val audioStreams = getClipAudioStreams(it.path)
             InputClip(it, timestamps, audioStreams)
@@ -153,7 +205,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
         inputs.all { it.audioStreams == audioStreams }
 
         // Assign all start/end timestamps to all N/N+1 couples
-        (0..<previousVideos.size - 1).forEach { index ->
+        (0..<clips.size - 1).forEach { index ->
             // For each N/N+1 couples, get their common keyframe
             // Then assign their timestamps to:
             //   - N'th video: end
@@ -230,20 +282,16 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
                 "-multipass", "0",
                 "-profile:v", "high",
                 "-tune", "hq",
-                mergePath.absolutePathString()
+                outputPath.absolutePathString()
             )
             .start()
             .redirectOutputs(outputStream, errorStream)
             .waitFor(logger, outputStream, errorStream)
+            .throwOnExitCode()
 
-        logger.info { "Merged ${previousVideos.joinToString { it.path.name }} into $mergePath" }
+        logger.info { "Merged ${clips.joinToString { it.path.name }} into $outputPath" }
 
-        logger.debug { "Deleting source files: ${previousVideos.joinToString { it.path.absolutePathString() }}" }
-        previousVideos.forEach {
-            getKeyframeFolder(it.path).deleteRecursively()
-            it.path.deleteExisting()
-        }
-        logger.info { "Deleted source files: ${previousVideos.joinToString { it.path.absolutePathString() }}" }
+        removeClipGroup(clipGroup)
     }
 
     private suspend fun getKeyframeTimestamps(path: ClipPath): List<KeyframeTimestamp> = withContext(Dispatchers.IO) {
@@ -262,7 +310,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
             .start()
             .redirectOutputs(outputStream, errorStream)
             .waitFor(logger, outputStream, errorStream)
-            .also { if (it.exitValue() != 0) throw IOException() }
+            .throwOnExitCode()
 
         // Read each line as a timestamp
         outputStream.toByteArray().decodeToString().trim().lines()
@@ -283,7 +331,7 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
             .start()
             .redirectOutputs(outputStream, errorStream)
             .waitFor(logger, outputStream, errorStream)
-            .also { if (it.exitValue() != 0) throw IOException() }
+            .throwOnExitCode()
 
         // Read the last line as an integer
         outputStream.toByteArray().decodeToString().trim().lines().last().toInt()
@@ -297,10 +345,18 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
             .let { this.keyframeIndexByHash[it] }
     }
 
-    private suspend fun extractKeyframes(newFile: Path): Path = withContext(Dispatchers.IO) {
-        logger.debug { "Extracting keyframes from $newFile" }
+    private fun Clip.sharesKeyframe(otherKeyframeIndexByHash: Map<KeyframeHash, KeyframeIndex>): Boolean {
+        val hashes = this.keyframeIndexByHash.keys
+        val otherHashes = otherKeyframeIndexByHash.keys
+        return hashes.any { it in otherHashes }
+    }
 
-        val keyframesFolder = getKeyframeFolder(newFile).createDirectory()
+    private suspend fun extractKeyframes(clipPath: ClipPath): KeyframeFolder = withContext(Dispatchers.IO) {
+        logger.debug { "Extracting keyframes from $clipPath" }
+
+        val keyframesFolder = memFS.mountPointPath
+            .resolve("${clipPath.nameWithoutExtension} - Keyframes")
+            .createDirectory()
 
         val outputStream = ByteArrayOutputStream()
         val errorStream = ByteArrayOutputStream()
@@ -310,24 +366,25 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
                 "ffmpeg",
                 "-v", "warning",
                 "-skip_frame", "nokey",
-                "-i", newFile.absolutePathString(),
+                "-i", clipPath.absolutePathString(),
                 "-vsync", "0",
                 "-f", "image2",
-                "${keyframesFolder.absolutePathString()}/keyframe-0%3d.png")
+                "${keyframesFolder.absolutePathString()}/keyframe-0%3d.png"
+            )
             .start()
             .redirectOutputs(outputStream, errorStream)
             .waitFor(logger, outputStream, errorStream)
+        // Don't throw on error, this is not fatal and will fall back to a singleton group
 
-        logger.info { "Extracted keyframes of $newFile" }
+        logger.info { "Extracted keyframes of $clipPath" }
         keyframesFolder
     }
 
-    private fun getKeyframeFolder(clipPath: ClipPath): Path =
-        memFS.mountPointPath.resolve("${clipPath.nameWithoutExtension} - Keyframes")
-
     @OptIn(ExperimentalPathApi::class)
-    private fun hashKeyframes(newFile: Path, keyframesFolder: Path): Map<String, Int> {
-        logger.debug { "Hashing keyframes from $newFile" }
+    private suspend fun hashKeyframes(clipPath: ClipPath): Map<String, Int> = withContext(Dispatchers.IO) {
+        val keyframesFolder = extractKeyframes(clipPath)
+
+        logger.debug { "Hashing keyframes from $clipPath" }
 
         //TODO optimize using direct FileObj access
         val keyframeIndexByHash = keyframesFolder
@@ -340,29 +397,12 @@ class RecordWatcher(private val memFS: WinFspMemFS) : MemFSListener {
                 hash to keyframeNumber
             }
 
-        logger.info { "Hashed keyframes of $newFile" }
-        return keyframeIndexByHash
-    }
+        logger.info { "Hashed keyframes of $clipPath" }
 
-    private suspend fun checkMismatchedKeyframe(currentClip: Clip, onMismatch: suspend () -> Unit) {
-        // Try to find a video with matching keyframe
-        // If the previous video doesn't have any matching keyframe,
-        // then flush previous videos, optionally combining them if there is more than 2
-        if (clips.size > 1) {
-            // Find matching keyframe with previous video
-            val previousClip = clips[clips.size - 2]
+        logger.debug { "Cleaning up keyframes" }
+        keyframesFolder.deleteRecursively()
+        logger.info { "Cleaned up keyframes" }
 
-            logger.debug { "Trying to match keyframes between ${currentClip.path} and ${previousClip.path}" }
-
-            // Simply check if two frames match, no info is required
-            val hasMatchingHash = currentClip.matchKeyframe(previousClip) != null
-
-            if (hasMatchingHash) {
-                logger.info { "Matched keyframe between ${currentClip.path} and ${previousClip.path}, keeping videos" }
-            } else {
-                logger.info { "Found no matched keyframe between ${currentClip.path} and ${previousClip.path}, flushing previous videos to disk" }
-                onMismatch()
-            }
-        }
+        keyframeIndexByHash
     }
 }

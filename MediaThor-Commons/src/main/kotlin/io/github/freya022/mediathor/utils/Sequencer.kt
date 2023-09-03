@@ -1,4 +1,4 @@
-package io.github.freya022.mediathor.record
+package io.github.freya022.mediathor.utils
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel

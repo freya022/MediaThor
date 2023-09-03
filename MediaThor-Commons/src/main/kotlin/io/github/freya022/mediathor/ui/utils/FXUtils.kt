@@ -9,7 +9,7 @@ import kotlinx.coroutines.*
 
 private object FXUtils {}
 
-private val uiScope = getDefaultScope(Dispatchers.Main.immediate)
+val uiScope = getDefaultScope(Dispatchers.Main.immediate)
 
 fun launchMainContext(block: suspend CoroutineScope.() -> Unit): Job {
     return uiScope.launch(block = block)
@@ -24,6 +24,16 @@ fun <T> loadFxml(controller: T, name: String): T = FXMLLoader().apply {
     setController(controller)
 }.load(FXUtils::class.java.getResourceAsStream("/view/$name.fxml"))
 
+fun Node.toggleStyleClass(styleClass: String) {
+    val classes = getStyleClass()
+    val idx: Int = classes.indexOf(styleClass)
+    if (idx >= 0) {
+        classes.removeAt(idx)
+    } else {
+        classes.add(styleClass)
+    }
+}
+
 inline fun <R> withAnimationTimer(crossinline action: () -> Unit, block: () -> R): R {
     val animationTimer = object : AnimationTimer() {
         override fun handle(now: Long) = action()
@@ -36,14 +46,14 @@ inline fun <R> withAnimationTimer(crossinline action: () -> Unit, block: () -> R
     }
 }
 
-inline fun <R> Labeled.withDebounce(text: String, disabledNode: Node = this, block: () -> R): R {
+inline fun <R> Labeled.withDebounce(text: String, vararg disabledNodes: Node = arrayOf(this), block: () -> R): R {
     val oldText = this.text
-    disabledNode.isDisable = true
+    disabledNodes.forEach { it.isDisable = true }
     this.text = text
     return try {
         block()
     } finally {
-        disabledNode.isDisable = false
+        disabledNodes.forEach { it.isDisable = false }
         this.text = oldText
     }
 }

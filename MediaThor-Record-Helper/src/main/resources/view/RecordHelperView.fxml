@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+<fx:root maxWidth="1200.0" minHeight="400.0" minWidth="600.0" type="HBox" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
+   <children>
+      <ScrollPane fx:id="clipGroupsPane" fitToWidth="true" HBox.hgrow="ALWAYS">
+         <content>
+            <VBox fx:id="clipGroupsBox" spacing="10.0" />
+         </content>
+         <HBox.margin>
+            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+         </HBox.margin>
+      </ScrollPane>
+      <Separator orientation="VERTICAL" styleClass="small" />
+      <VBox minWidth="-Infinity" spacing="5.0">
+         <children>
+            <Button fx:id="flushButton" defaultButton="true" disable="true" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#onFlushAction" text="Flush selected...">
+               <graphic>
+                  <FontIcon iconLiteral="mdal-call_merge" />
+               </graphic></Button>
+            <Button fx:id="deleteButton" disable="true" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#onDeleteAction" styleClass="danger" text="Delete selected">
+               <graphic>
+                  <FontIcon iconLiteral="mdal-delete_forever" />
+               </graphic></Button>
+            <Pane VBox.vgrow="ALWAYS" />
+            <Button fx:id="replayBufferButton" defaultButton="true" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#onReplayBufferAction" text="Start replay buffer">
+               <graphic>
+                  <FontIcon iconLiteral="mdrmz-play_arrow" />
+               </graphic></Button>
+         </children>
+         <padding>
+            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+         </padding>
+      </VBox>
+   </children>
+</fx:root>

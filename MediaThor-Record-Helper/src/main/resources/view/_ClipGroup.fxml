@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+<fx:root alignment="TOP_LEFT" styleClass="dense" type="TitledPane" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
+   <content>
+      <ScrollPane fx:id="clipsPane" fitToHeight="true">
+         <content>
+            <HBox fx:id="clipsBox" spacing="10.0" />
+         </content>
+      </ScrollPane>
+   </content>
+   <graphic>
+      <HBox fx:id="titleBox" alignment="CENTER_LEFT" spacing="5.0">
+         <children>
+            <Label fx:id="titleLabel" text="1 clip - 2m -&gt; C:\Users\freya02\Videos\Replay 2023-08-21 19-12-29.mkv" />
+            <Pane maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS" />
+            <Button fx:id="mergeButton" defaultButton="true" mnemonicParsing="false" onAction="#onMergeAction" text="Merge">
+               <graphic>
+                  <FontIcon iconLiteral="mdal-insert_link" />
+               </graphic>
+            </Button>
+         </children>
+      </HBox>
+   </graphic>
+</fx:root>

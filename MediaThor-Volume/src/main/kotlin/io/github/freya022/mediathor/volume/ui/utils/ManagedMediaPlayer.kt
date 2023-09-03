@@ -9,14 +9,13 @@ import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventListener
-import uk.co.caprica.vlcj.player.embedded.EmbeddedMediaPlayer
 
 private val logger = KotlinLogging.logger { }
 
 class ManagedMediaPlayer(volume: Int) {
     private val mutex = Mutex()
     private val mediaPlayerFactory: MediaPlayerFactory = MediaPlayerFactory()
-    private val mediaPlayer: EmbeddedMediaPlayer = mediaPlayerFactory.mediaPlayers().newEmbeddedMediaPlayer()
+    private val mediaPlayer: MediaPlayer = mediaPlayerFactory.mediaPlayers().newMediaPlayer()
 
     private var mediaPlayerEventListener: MediaPlayerEventListener? = null
     private var currentMedia: String? = null
@@ -62,6 +61,8 @@ class ManagedMediaPlayer(volume: Int) {
 
         // If the source isn't the same, then prepare to play
         if (currentMedia != url) {
+            // Cannot use the 'start-time' option,
+            // as the media might have changed and could cause incorrect seeking
             mediaPlayer.media().prepare(url)
             currentMedia = url
         }

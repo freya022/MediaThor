@@ -1,12 +1,12 @@
 package io.github.freya022.mediathor.volume.ui.controller
 
 import atlantafx.base.controls.ProgressSliderSkin
+import io.github.freya022.mediathor.ui.utils.listener
 import io.github.freya022.mediathor.volume.Data
 import io.github.freya022.mediathor.volume.VolumeAdjusterData
 import io.github.freya022.mediathor.volume.VolumeAdjusterData.AdjustmentData
 import io.github.freya022.mediathor.volume.VolumeAdjusterData.OutputFolder
 import io.github.freya022.mediathor.volume.ui.utils.ManagedMediaPlayer
-import javafx.beans.InvalidationListener
 import javafx.fxml.FXML
 import javafx.scene.control.Label
 import javafx.scene.control.Slider
@@ -37,7 +37,7 @@ class VolumeAdjusterController : VBox() {
         masterVolumeLabel.textProperty().bind(masterVolumeSlider.valueProperty().asString("%.0f %%"))
 
         mediaPlayer = ManagedMediaPlayer(masterVolumeSlider.value.roundToInt())
-        masterVolumeSlider.valueProperty().addListener(InvalidationListener { mediaPlayer.volume = masterVolumeSlider.value.roundToInt() })
+        masterVolumeSlider.valueProperty().listener { _, _, newVolume -> mediaPlayer.volume = newVolume.toInt() }
 
         inputDirectory
             .walk()

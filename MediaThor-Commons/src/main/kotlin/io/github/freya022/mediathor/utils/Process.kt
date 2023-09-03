@@ -6,9 +6,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mu.two.KLogger
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Path
+import kotlin.jvm.optionals.getOrNull
 
 fun ProcessBuilder.directory(path: Path): ProcessBuilder = directory(path.toFile())
 
@@ -43,6 +45,15 @@ suspend fun Process.waitFor(
     }
 
     this@waitFor
+}
+
+fun Process.throwOnExitCode() {
+    val exitCode = exitValue()
+    if (exitCode != 0) {
+        val info = info()
+        val commandLine = info.commandLine().getOrNull() ?: "<no command line available>"
+        throw IOException("Process exited with code $exitCode: $commandLine")
+    }
 }
 
 suspend fun redirectStream(outputStream: OutputStream, processStream: InputStream) = withContext(Dispatchers.IO) {

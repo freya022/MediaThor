@@ -6,7 +6,7 @@
     <parent>
         <groupId>io.github.freya022</groupId>
         <artifactId>mediathor</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.0</version>
     </parent>
 
     <artifactId>mediathor-dl</artifactId>
@@ -16,7 +16,7 @@
         <dependency>
             <groupId>io.github.freya022</groupId>
             <artifactId>mediathor-commons</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.0</version>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
