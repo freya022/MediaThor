@@ -1,9 +1,7 @@
 package io.github.freya022.mediathor.dl.ui.view
 
-import atlantafx.base.theme.NordDark
 import io.github.freya022.mediathor.dl.ui.controller.DownloadController
 import io.github.freya022.mediathor.ui.utils.withMainContext
-import javafx.application.Application
 import javafx.fxml.FXMLLoader
 import javafx.scene.Parent
 import javafx.scene.Scene
@@ -15,16 +13,14 @@ import kotlin.system.exitProcess
 
 class DownloadView private constructor() {
     companion object {
-        suspend fun createView(): DownloadController = withMainContext {
-            Application.setUserAgentStylesheet(NordDark().userAgentStylesheet)
-
+        suspend fun createView(stage: Stage): DownloadController = withMainContext {
             DownloadController().also { controller ->
                 val root: Parent = FXMLLoader().apply {
                     setRoot(controller)
                     setController(controller)
                 }.load(DownloadView::class.java.getResourceAsStream("/view/DownloadView.fxml"))
 
-                Stage().apply {
+                stage.apply {
                     scene = Scene(root)
                     setOnCloseRequest {
                         val buttonType = Alert(

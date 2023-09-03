@@ -2,6 +2,7 @@ package io.github.freya022.mediathor.dl.ui.controller
 
 import io.github.freya022.mediathor.dl.DownloaderListener
 import io.github.freya022.mediathor.dl.MediaThorDownloader
+import io.github.freya022.mediathor.dl.ui.App
 import io.github.freya022.mediathor.dl.ui.model.Media
 import io.github.freya022.mediathor.ui.utils.*
 import io.github.freya022.mediathor.utils.extractThumbnail
@@ -21,7 +22,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import mu.two.KotlinLogging
-import java.awt.Desktop
 import java.nio.file.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.inputStream
@@ -140,7 +140,7 @@ class DownloadItemController(
 
     @FXML
     private fun onGoToDirectoryAction(event: ActionEvent) {
-        Desktop.getDesktop().open(path.parent.toFile())
+        App.instance.hostServices.showDocument(path.parent.absolutePathString())
     }
 
     @FXML

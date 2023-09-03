@@ -24,11 +24,12 @@ inline fun runCatchingUntil(tries: Int, errorSupplier: () -> String, block: () -
     repeat(tries) {
         try {
             block()
-        } catch (e: HttpForbiddenException) {
-            throw e
-        } catch (e: CancellationException) {
-            throw e
         } catch (e: Exception) {
+            // native-image has issues with multiple catch blocks
+            if (e is HttpForbiddenException || e is CancellationException) {
+                throw e
+            }
+
             KotlinLogging.logger { }.error(errorSupplier(), e)
         }
     }
