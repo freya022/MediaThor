@@ -61,6 +61,8 @@ class ManagedMediaPlayer(volume: Int) {
 
         // If the source isn't the same, then prepare to play
         if (currentMedia != url) {
+            // Cannot use the 'start-time' option,
+            // as the media might have changed and could cause incorrect seeking
             mediaPlayer.media().prepare(url)
             currentMedia = url
         }
