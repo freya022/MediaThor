@@ -25,21 +25,24 @@
       "name":"com.sun.javafx.tk.quantum.QuantumMessagesBundle",
       "locales":[
         "", 
-        "fr"
+        "fr", 
+        "und"
       ]
     }, 
     {
       "name":"com/sun/glass/ui/win/themes",
       "locales":[
         "", 
-        "fr"
+        "fr", 
+        "und"
       ]
     }, 
     {
       "name":"com/sun/javafx/scene/control/skin/resources/controls",
       "locales":[
         "", 
-        "fr"
+        "fr", 
+        "und"
       ]
     }, 
     {

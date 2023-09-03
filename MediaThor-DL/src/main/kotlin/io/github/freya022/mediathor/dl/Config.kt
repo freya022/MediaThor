@@ -6,7 +6,7 @@ import io.github.freya022.mediathor.adapters.PathAdapter
 import java.nio.file.Path
 import kotlin.io.path.*
 
-class Config private constructor(val tempDirectory: Path) {
+class Config(val tempDirectory: Path) {
     companion object {
         val gson: Gson = GsonBuilder()
             .registerTypeAdapter(Path::class.java, PathAdapter)

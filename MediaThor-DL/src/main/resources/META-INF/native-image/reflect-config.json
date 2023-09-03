@@ -162,7 +162,8 @@
 },
 {
   "name":"io.github.freya022.mediathor.dl.Config",
-  "allDeclaredFields":true
+  "allDeclaredFields":true,
+  "unsafeAllocated":true
 },
 {
   "name":"io.github.freya022.mediathor.dl.ui.controller.DownloadController",
