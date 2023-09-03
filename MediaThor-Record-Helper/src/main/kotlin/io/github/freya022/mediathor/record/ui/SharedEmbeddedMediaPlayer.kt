@@ -5,13 +5,15 @@ import io.github.freya022.mediathor.utils.withVlcContext
 import javafx.scene.image.ImageView
 import mu.two.KotlinLogging
 import uk.co.caprica.vlcj.javafx.videosurface.ImageViewVideoSurface
+import uk.co.caprica.vlcj.media.callback.seekable.RandomAccessFileMedia
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventListener
+import java.nio.file.Path
 import java.util.*
 
 private val logger = KotlinLogging.logger { }
 
 class SharedEmbeddedMediaPlayer {
-    private class State(val surface: ImageViewVideoSurface, var time: Long) {
+    private class State(val surface: ImageViewVideoSurface, val media: RandomAccessFileMedia, var time: Long) {
         lateinit var listener: MediaPlayerEventListener
     }
 
@@ -21,15 +23,16 @@ class SharedEmbeddedMediaPlayer {
     private val stateMap: MutableMap<ImageView, State> = IdentityHashMap()
     private lateinit var currentState: State
 
-    suspend fun initialFrame(mrl: String, view: ImageView): Unit = withVlcContext {
+    suspend fun initialFrame(path: Path, view: ImageView): Unit = withVlcContext {
+        val media = RandomAccessFileMedia(path.toFile(), 1024 * 1024)
         val surface = ImageViewVideoSurface(view)
         initPlayer.videoSurface().set(surface)
-        initPlayer.media().startPaused(mrl)
+        initPlayer.media().startPaused(media)
 
-        stateMap[view] = State(ImageViewVideoSurface(view), 0)
+        stateMap[view] = State(ImageViewVideoSurface(view), media, 0)
     }
 
-    suspend fun play(mrl: String, view: ImageView, listener: MediaPlayerEventListener, pause: Boolean = false): Unit = withVlcContext {
+    suspend fun play(path: Path, view: ImageView, listener: MediaPlayerEventListener, pause: Boolean = false): Unit = withVlcContext {
         val state = stateMap[view]
             ?: return@withVlcContext logger.error("$view was not initialized for $this")
         if (!::currentState.isInitialized || state !== currentState) {
@@ -48,7 +51,7 @@ class SharedEmbeddedMediaPlayer {
             embeddedMediaPlayer.events().addMediaPlayerEventListener(listener)
 
             // Start playing
-            embeddedMediaPlayer.media().start(mrl, "start-time=${currentState.time / 1000f}")
+            embeddedMediaPlayer.media().start(state.media, "start-time=${currentState.time / 1000f}")
         } else {
             embeddedMediaPlayer.controls().setPause(pause)
         }
@@ -56,5 +59,11 @@ class SharedEmbeddedMediaPlayer {
 
     suspend fun setPosition(position: Float): Unit = withVlcContext {
         embeddedMediaPlayer.controls().setPosition(position)
+    }
+
+    fun stop() {
+        // This also causes the handle to be released,
+        // but only if the source is a callback media
+        embeddedMediaPlayer.controls().stop()
     }
 }

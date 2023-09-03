@@ -24,7 +24,6 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatterBuilder
 import java.time.temporal.ChronoField.*
 import java.util.*
-import kotlin.io.path.absolutePathString
 import kotlin.time.DurationUnit
 import kotlin.time.toKotlinDuration
 
@@ -40,8 +39,6 @@ private val timestampFormatter = DateTimeFormatterBuilder()
     .appendLiteral(':')
     .appendValue(SECOND_OF_MINUTE, 2)
     .toFormatter(Locale.getDefault());
-
-private val player = SharedEmbeddedMediaPlayer()
 
 class ClipController(
     private val recordHelperController: RecordHelperController,
@@ -105,7 +102,7 @@ class ClipController(
                 }
             }
 
-            player.initialFrame(clip.path.absolutePathString(), clipView)
+            player.initialFrame(clip.path, clipView)
 
             progressBar.onClick {
                 launchVlcContext {
@@ -116,7 +113,7 @@ class ClipController(
             //TODO add global volume
             contentPane.hoverProperty().addListener { _, _, isHover ->
                 launchVlcContext {
-                    player.play(clip.path.absolutePathString(), clipView, listener, pause = !isHover)
+                    player.play(clip.path, clipView, listener, pause = !isHover)
                 }
             }
         }
@@ -141,5 +138,9 @@ class ClipController(
             toggleStyleClass(selectedClass)
             recordHelperController.updateButtons()
         }
+    }
+
+    companion object {
+        val player = SharedEmbeddedMediaPlayer()
     }
 }

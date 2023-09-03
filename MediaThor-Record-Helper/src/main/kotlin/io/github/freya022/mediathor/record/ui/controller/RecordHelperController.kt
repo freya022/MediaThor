@@ -109,6 +109,8 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
     }
 
     suspend fun mergeClips(groups: List<ClipGroup>) = withMainContext {
+        ClipController.player.stop()
+
         flushButton.withDebounce("Merging...", flushButton, deleteButton) {
             groups.forEach {
                 recordWatcher.flushGroup(it)
