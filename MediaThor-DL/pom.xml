@@ -24,6 +24,13 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>${mainClass}</mainClass>
+                    <!-- Required for reflecting HWND of Stage -->
+                    <options>
+                        <option>--add-opens</option>
+                        <option>javafx.graphics/javafx.stage=ALL-UNNAMED</option>
+                        <option>--add-exports</option>
+                        <option>javafx.graphics/com.sun.javafx.tk=ALL-UNNAMED</option>
+                    </options>
                 </configuration>
             </plugin>
             <plugin>
