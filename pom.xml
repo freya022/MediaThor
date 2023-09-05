@@ -14,6 +14,7 @@
         <module>MediaThor-Volume</module>
         <module>MediaThor-Record-Helper</module>
         <module>MediaThor-Commons</module>
+        <module>MediaThor-Interceptor</module>
     </modules>
 
     <name>MediaThor</name>
@@ -209,6 +210,11 @@
                 <groupId>com.github.jnr-winfsp-team</groupId>
                 <artifactId>jnr-winfsp</artifactId>
                 <version>c7be8901e8</version>
+            </dependency>
+            <dependency>
+                <groupId>org.seleniumhq.selenium</groupId>
+                <artifactId>selenium-java</artifactId>
+                <version>4.12.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
