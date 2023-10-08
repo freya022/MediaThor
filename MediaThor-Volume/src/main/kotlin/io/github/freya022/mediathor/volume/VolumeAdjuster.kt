@@ -62,9 +62,10 @@ class VolumeAdjuster(
         val htmlOutput = sendFile()
 
         val document = Jsoup.parse(htmlOutput)
-        val downloadLink = document.selectFirst("div.form-container > div.alert-success > div.mb-3 > a")?.attr("href")
+        val elements = document.select("article > div.alert-success > p > a").map { it.attr("href") }
+        val downloadLink = elements.find { "/download.php" in it }
             ?: throwParseError(htmlOutput, "Failed to get download link")
-        val deleteLink = document.selectFirst("div.form-container > div.alert-success > div > a.text-danger")?.attr("href")
+        val deleteLink = elements.find { "/delete-file.php" in it }
             ?: throwParseError(htmlOutput, "Failed to get delete link")
 
         downloadOutput(downloadLink)
@@ -94,7 +95,7 @@ class VolumeAdjuster(
     }
 
     private fun throwParseError(htmlOutput: String, message: String): Nothing {
-        val errorFile = createTempFile(Path(""), prefix = input.nameWithoutExtension, suffix = ".${input.extension}")
+        val errorFile = createTempFile(Path(""), prefix = input.nameWithoutExtension, suffix = ".html")
         errorFile.writeText(htmlOutput)
         throw IllegalArgumentException("$message, see $errorFile")
     }
