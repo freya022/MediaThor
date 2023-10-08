@@ -133,7 +133,11 @@ class VolumeAdjusterItemController(
             override fun decrement(steps: Int) {
                 value -= BigDecimal("0.5") * steps.toBigDecimal()
                 if (value.toDouble() > -1 && value.toDouble() < 1) {
-                    value = BigDecimal.ONE.negate()
+                    value = if (value.toDouble() > 0) {
+                        BigDecimal.ZERO
+                    } else {
+                        BigDecimal.ONE.negate()
+                    }
                 } else if (value.toDouble() < -50) {
                     value = BigDecimal(-50)
                 }
@@ -142,7 +146,11 @@ class VolumeAdjusterItemController(
             override fun increment(steps: Int) {
                 value += BigDecimal("0.5") * steps.toBigDecimal()
                 if (value.toDouble() > -1 && value.toDouble() < 1) {
-                    value = BigDecimal.ONE
+                    value = if (value.toDouble() < 0) {
+                        BigDecimal.ZERO
+                    } else {
+                        BigDecimal.ONE
+                    }
                 } else if (value.toDouble() > 50) {
                     value = BigDecimal(50)
                 }
