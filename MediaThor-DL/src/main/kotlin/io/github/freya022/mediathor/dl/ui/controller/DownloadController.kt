@@ -18,6 +18,7 @@ class DownloadController : VBox() {
     private var initialDirectory: Path? = null
 
     private val downloadedUrls: MutableSet<String> = hashSetOf()
+    private val downloadedPaths: MutableSet<Path> = hashSetOf()
 
     @FXML
     private fun initialize() {
@@ -28,10 +29,9 @@ class DownloadController : VBox() {
     private fun onDownloadAction(event: ActionEvent) = launchMainContext {
         val masterUrl = playlistField.text
         if (masterUrl in downloadedUrls) {
-            Alert(Alert.AlertType.ERROR, "This has already been downloaded")
+            return@launchMainContext Alert(Alert.AlertType.ERROR, "This has already been downloaded")
                 .apply { initOwner(this@DownloadController.scene.window) }
                 .show()
-            return@launchMainContext
         }
 
         scene.window.fileChooser(
@@ -41,12 +41,19 @@ class DownloadController : VBox() {
         ) { path ->
             initialDirectory = path.parent
 
+            if (path in downloadedPaths) {
+                return@launchMainContext Alert(Alert.AlertType.ERROR, "This has already been scheduled for download")
+                    .apply { initOwner(this@DownloadController.scene.window) }
+                    .show()
+            }
+
             playlistField.clear()
 
             val downloadItemController = DownloadItemController.createView(masterUrl, path)
             downloadsBox.children += downloadItemController
 
             downloadItemController.startAsync()
+            downloadedPaths.add(path)
             downloadedUrls.add(masterUrl)
         }
     }
