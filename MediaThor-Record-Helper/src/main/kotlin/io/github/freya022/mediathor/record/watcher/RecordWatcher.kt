@@ -182,12 +182,14 @@ class RecordWatcherImpl : KoinComponent, MemFSListener, RecordWatcher {
             logger.debug { "Moving $previousVideoPath into $outputPath" }
 
             // Copy
-            previousVideoPath.moveTo(outputPath)
+            previousVideoPath.copyTo(outputPath)
 
             logger.info { "Moved $previousVideoPath into $outputPath" }
 
             // Delete group and cleanup
             removeClipGroup(clipGroup)
+
+            previousVideoPath.deleteIfExists()
 
             return@withContext
         }
