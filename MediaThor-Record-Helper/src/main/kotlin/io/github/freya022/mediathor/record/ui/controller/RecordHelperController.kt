@@ -96,6 +96,8 @@ class RecordHelperController : HBox(), KoinComponent, RecordWatcherListener {
     }
 
     suspend fun deleteClips(clips: List<Clip>) = withMainContext {
+        ClipController.player.stop()
+
         deleteButton.withDebounce("Deleting...", deleteButton, flushButton) {
             clips.forEach {
                 recordWatcher.removeClip(it)
