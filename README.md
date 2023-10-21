@@ -6,5 +6,6 @@ These utilities are focused on specific use cases, the goal is NOT a swiss army 
 
 ## Subprojects
 * [MediaThor-DL](MediaThor-DL): A downloader for HLS streams
+* [MediaThor-Interceptor](MediaThor-Interceptor): Writes *.m3u8 files in a list from browser usage
 * [MediaThor-Volume](MediaThor-Volume): Helps you manage the volume of your music files
 * [MediaThor-Record-Helper](MediaThor-Record-Helper): Merges overlapping clips using a temporary ramdisk
