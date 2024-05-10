@@ -41,7 +41,7 @@ class VolumeAdjusterController : VBox() {
 
         inputDirectory
             .walk()
-            .filter { it.extension == "mp3" }
+            .filter { it.extension == "mp3" || it.extension == "opus" }
             .sortedBy { it.nameWithoutExtension }
             .forEachIndexed { i, inputFile ->
                 val fileName = inputFile.name
