@@ -46,17 +46,17 @@ class VolumeAdjusterController : VBox() {
             .filter { it.extension in supportedExtensions }
             .sortedBy { it.nameWithoutExtension }
             .forEachIndexed { i, inputFile ->
-                val fileName = inputFile.name
-                val outputFile = outputDirectory.resolve(fileName)
+                val outputFileName = "${inputFile.nameWithoutExtension}.opus"
+                val outputPath = outputDirectory.resolve(outputFileName)
                 //Copy input file if output does not exist, is the same as if zero transformations were applied
-                if (outputFile.notExists()) {
-                    inputFile.copyTo(outputFile)
+                if (outputPath.notExists()) {
+                    inputFile.copyTo(outputPath)
                 }
 
                 val outputFolder = data.outputs.computeIfAbsent(outputDirectory) { OutputFolder(hashMapOf()) }
-                val adjustmentData = outputFolder.files.computeIfAbsent(fileName) { AdjustmentData(BigDecimal.ZERO) }
+                val adjustmentData = outputFolder.files.computeIfAbsent(outputFileName) { AdjustmentData(BigDecimal.ZERO) }
 
-                outputsGrid.addRow(i, Label(inputFile.nameWithoutExtension), VolumeAdjusterItemController(inputFile, outputFile, adjustmentData, this))
+                outputsGrid.addRow(i, Label(inputFile.nameWithoutExtension), VolumeAdjusterItemController(inputFile, outputPath, adjustmentData, this))
             }
     }
 }

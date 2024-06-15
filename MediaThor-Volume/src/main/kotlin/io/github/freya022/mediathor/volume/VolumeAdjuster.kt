@@ -42,7 +42,7 @@ class VolumeAdjuster(
 
         val outputStream = ByteArrayOutputStream()
         val errorStream = ByteArrayOutputStream()
-        val tmpOutput = Files.createTempFile(input.nameWithoutExtension, ".${input.extension}")
+        val tmpOutput = Files.createTempFile(output.nameWithoutExtension, ".${output.extension}")
         ProcessBuilder()
             .command("ffmpeg", "-y", "-v", "quiet",
                 "-i", input.absolutePathString(),
