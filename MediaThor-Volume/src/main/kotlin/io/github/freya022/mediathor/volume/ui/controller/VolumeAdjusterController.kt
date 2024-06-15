@@ -16,6 +16,8 @@ import java.math.BigDecimal
 import kotlin.io.path.*
 import kotlin.math.roundToInt
 
+private val supportedExtensions = setOf("mp3", "opus", "ogg")
+
 class VolumeAdjusterController : VBox() {
     private val data = VolumeAdjusterData.instance
     private val inputDirectory = Data.volumeInputDirectory
@@ -41,7 +43,7 @@ class VolumeAdjusterController : VBox() {
 
         inputDirectory
             .walk()
-            .filter { it.extension == "mp3" || it.extension == "opus" }
+            .filter { it.extension in supportedExtensions }
             .sortedBy { it.nameWithoutExtension }
             .forEachIndexed { i, inputFile ->
                 val fileName = inputFile.name
