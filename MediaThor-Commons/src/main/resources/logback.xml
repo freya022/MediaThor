@@ -6,11 +6,15 @@
         </encoder>
     </appender>
 
-    <root level="trace">
+    <root name="io.github.freya022" level="trace" additivity="false">
         <appender-ref ref="STDOUT"/>
     </root>
 
     <root name="io.github.freya022.mediathor.record.memfs" level="debug" additivity="false">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+    <root level="info">
         <appender-ref ref="STDOUT"/>
     </root>
 </configuration>
